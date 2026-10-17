@@ -19,14 +19,16 @@ class GameEngine extends ChangeNotifier {
   Timer? _botTimer;
   int _gameSessionId = 0;
   bool _isProcessingMove = false;
+  bool _isPaused = false;
 
   GameEngine({GameSettings? initialSettings})
-      : _settings = initialSettings ?? const GameSettings();
+      : _settings = initialSettings ?? GameSettings.current;
 
   GameState? get state => _state;
   GameSettings get settings => _settings;
   bool get hasActiveGame => _state != null;
   bool get isProcessingMove => _isProcessingMove;
+  bool get isPaused => _isPaused;
 
   void updateSettings(GameSettings newSettings) {
     _settings = newSettings;
@@ -34,15 +36,19 @@ class GameEngine extends ChangeNotifier {
   }
 
   /// Starts a new game with [totalPlayers] (4, 5, or 6).
+  /// If [deferBotStart] is true, bot turns wait until [beginActivePlay] is called
+  /// (used while the initial card dealing animation plays on screen).
   void startNewGame({
     int? totalPlayers,
     int? randomSeed,
     List<CountryType>? predefinedTypes,
+    bool deferBotStart = false,
   }) {
     _cancelBotAction();
     _gameSessionId++;
     final currentSession = _gameSessionId;
     _isProcessingMove = false;
+    _isPaused = deferBotStart;
 
     final n = totalPlayers ?? _settings.totalPlayers;
     if (n < 4 || n > 6) {
@@ -58,7 +64,7 @@ class GameEngine extends ChangeNotifier {
       random: rng,
     );
 
-    // 2. Perform simultaneous initial exchange with Western name generation
+    // 2. Perform simultaneous initial exchange with clean Western names
     final players = InitialExchangeService.performInitialExchange(
       activeTypes: deckResult.activeTypes,
       initialDeckByType: deckResult.ordinaryCardsByType,
@@ -67,9 +73,13 @@ class GameEngine extends ChangeNotifier {
 
     // 3. Random starting player
     final startingIndex = rng.nextInt(n);
+    final startingPlayer = players[startingIndex];
 
     // 4. Construct initial state
-    final startingPlayerName = players[startingIndex].name;
+    final initialStatus = startingPlayer.isHuman
+        ? 'Opening move: Choose a card from your hand to trade for Global.'
+        : '${startingPlayer.name} takes the opening turn with Global.';
+
     _state = GameState(
       totalPlayers: n,
       activeTypes: deckResult.activeTypes,
@@ -79,19 +89,34 @@ class GameEngine extends ChangeNotifier {
       currentTurnPlayerIndex: startingIndex,
       turnCount: 0,
       isOpeningMove: true,
-      statusMessage:
-          'Game started! $startingPlayerName was chosen to make the opening move with the Starting Card.',
+      statusMessage: initialStatus,
       moveLog: [
-        'Game initialized with $n players.',
-        '$startingPlayerName selected to take the Starting Card.',
+        'Game initialized with $n players (Winning Set: $n cards).',
+        startingPlayer.isHuman
+            ? 'You were selected to open with Global.'
+            : '${startingPlayer.name} selected to open with Global.',
       ],
     );
 
     verifyIntegrity();
     notifyListeners();
 
-    // If starting player is a bot, schedule their opening move
-    _triggerBotIfNeeded(currentSession);
+    if (!deferBotStart) {
+      _triggerBotIfNeeded(currentSession);
+    }
+  }
+
+  /// Called after initial dealing animation finishes or when unpausing the game.
+  void resumeActivePlay() {
+    if (_state == null) return;
+    _isPaused = false;
+    _triggerBotIfNeeded(_gameSessionId);
+  }
+
+  /// Pauses scheduled bot actions while pause dialog is open.
+  void pauseActivePlay() {
+    _isPaused = true;
+    _cancelBotAction();
   }
 
   /// Cancels any scheduled bot moves.
@@ -121,6 +146,7 @@ class GameEngine extends ChangeNotifier {
 
     _isProcessingMove = true;
     final state = _state!;
+    final activePlayerIndex = state.currentTurnPlayerIndex;
     final activePlayer = state.currentPlayer;
     final oldTableCard = state.tableCard;
 
@@ -137,15 +163,18 @@ class GameEngine extends ChangeNotifier {
 
     // 2. Update players list
     final updatedPlayers = List<GamePlayer>.from(state.players);
-    updatedPlayers[state.currentTurnPlayerIndex] = updatedPlayer;
+    updatedPlayers[activePlayerIndex] = updatedPlayer;
 
-    // 3. Check for victory immediately
-    final winningType = WinnerDetector.checkWinner(updatedPlayer);
+    // 3. Check for victory immediately using dynamic set size = state.totalPlayers
+    final winningType = WinnerDetector.checkWinner(
+      updatedPlayer,
+      requiredSetSize: state.totalPlayers,
+    );
     final hasWon = winningType != null;
 
     final logEntry = state.isOpeningMove
-        ? '${activePlayer.name} took the Starting Card and placed ${discardCard.displayName} on the table.'
-        : '${activePlayer.name} exchanged ${discardCard.displayName} for ${oldTableCard.displayName}.';
+        ? '${activePlayer.name} took Global and placed ${discardCard.displayName} on the table.'
+        : '${activePlayer.name} traded ${discardCard.displayName} for ${oldTableCard.displayName}.';
 
     final newMoveLog = List<String>.from(state.moveLog)..add(logEntry);
 
@@ -157,9 +186,13 @@ class GameEngine extends ChangeNotifier {
         isOpeningMove: false,
         winner: updatedPlayer,
         winningType: winningType,
-        statusMessage:
-            '🏆 ${updatedPlayer.name} has collected 4 ${winningType.displayName} cards and won the game!',
+        statusMessage: updatedPlayer.isHuman
+            ? '🏆 You collected all ${state.totalPlayers} ${winningType.displayName} cards and won the game!'
+            : '🏆 ${updatedPlayer.name} collected all ${state.totalPlayers} ${winningType.displayName} cards and won the game!',
         moveLog: newMoveLog,
+        lastMovePlayerIndex: activePlayerIndex,
+        lastTakenCard: oldTableCard,
+        lastDiscardedCard: discardCard,
       );
       _isProcessingMove = false;
       verifyIntegrity();
@@ -167,9 +200,14 @@ class GameEngine extends ChangeNotifier {
       return true;
     }
 
-    // 4. Advance turn to right-hand neighbor
-    final nextTurnIndex = (state.currentTurnPlayerIndex + 1) % state.totalPlayers;
+    // 4. Advance turn to next neighbor
+    final nextTurnIndex =
+        (state.currentTurnPlayerIndex + 1) % state.totalPlayers;
     final nextPlayer = updatedPlayers[nextTurnIndex];
+
+    final nextStatus = nextPlayer.isHuman
+        ? '${activePlayer.name} placed ${discardCard.displayName}. Select a card to trade.'
+        : '${activePlayer.name} placed ${discardCard.displayName} • ${nextPlayer.name}\'s turn';
 
     _state = state.copyWith(
       players: updatedPlayers,
@@ -177,21 +215,26 @@ class GameEngine extends ChangeNotifier {
       currentTurnPlayerIndex: nextTurnIndex,
       turnCount: state.turnCount + 1,
       isOpeningMove: false,
-      statusMessage: '${nextPlayer.name}\'s turn to exchange a card.',
+      statusMessage: nextStatus,
       moveLog: newMoveLog,
+      lastMovePlayerIndex: activePlayerIndex,
+      lastTakenCard: oldTableCard,
+      lastDiscardedCard: discardCard,
     );
 
     _isProcessingMove = false;
     verifyIntegrity();
     notifyListeners();
 
-    // Trigger next bot move if next player is bot
-    _triggerBotIfNeeded(currentSession);
+    // Trigger next bot move if next player is bot and game is not paused
+    if (!_isPaused) {
+      _triggerBotIfNeeded(currentSession);
+    }
     return true;
   }
 
   void _triggerBotIfNeeded(int sessionId) {
-    if (_state == null || _state!.isGameOver) return;
+    if (_state == null || _state!.isGameOver || _isPaused) return;
     if (_state!.isHumanTurn) return;
 
     _cancelBotAction();
@@ -201,7 +244,7 @@ class GameEngine extends ChangeNotifier {
         : const Duration(milliseconds: 100);
 
     _botTimer = Timer(delay, () {
-      if (_gameSessionId != sessionId) return;
+      if (_gameSessionId != sessionId || _isPaused) return;
       if (_state == null || _state!.isGameOver) return;
       if (_state!.isHumanTurn) return;
 
@@ -214,7 +257,7 @@ class GameEngine extends ChangeNotifier {
     });
   }
 
-  /// Verifies all 16 invariant rules specified in prompt section 16.
+  /// Verifies all invariant rules including dynamic N-card winning set size.
   bool verifyIntegrity() {
     if (_state == null) return true;
     final s = _state!;
@@ -254,15 +297,15 @@ class GameEngine extends ChangeNotifier {
       'Starting card must exist exactly once, found ${startingCards.length}',
     );
 
-    // 5. Invariant: Starting card cannot count towards victory
+    // 5. Invariant: Starting card cannot count towards victory; winner needs N ordinary cards
     for (final p in s.players) {
       final ordinaryCards = p.hand.where((c) => !c.isStartingCard).toList();
-      final winType = p.winningType;
+      final winType = p.getWinningType(requiredSetSize: n);
       if (winType != null) {
         final count = ordinaryCards.where((c) => c.type == winType).length;
         assert(
-          count >= 4,
-          'Player ${p.name} declared winner but only has $count of $winType',
+          count >= n,
+          'Player ${p.name} declared winner in $n-player game but only has $count of $winType',
         );
       }
     }
@@ -270,9 +313,12 @@ class GameEngine extends ChangeNotifier {
     return true;
   }
 
-  void resetCurrentGame() {
+  void resetCurrentGame({bool deferBotStart = false}) {
     if (_state != null) {
-      startNewGame(totalPlayers: _state!.totalPlayers);
+      startNewGame(
+        totalPlayers: _state!.totalPlayers,
+        deferBotStart: deferBotStart,
+      );
     }
   }
 

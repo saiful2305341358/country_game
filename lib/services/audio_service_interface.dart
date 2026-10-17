@@ -7,8 +7,8 @@ abstract class AudioServiceInterface {
   void playCardPlace();
   void playExchange();
   void playGameStart();
+  void playGameEnd();
   void playVictory();
   void playButtonClick();
-
   void dispose();
 }

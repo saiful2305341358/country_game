@@ -1,17 +1,24 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/game_card.dart';
 import '../models/game_player.dart';
 import '../models/game_state.dart';
 import '../services/audio_service.dart';
+import 'card_back_view.dart';
 import 'card_dimensions.dart';
 import 'country_card_view.dart';
 import 'player_seat.dart';
 
-class PlayingTable extends StatelessWidget {
+class PlayingTable extends StatefulWidget {
   final GameState state;
   final ValueChanged<GameCard> onCardSelected;
   final VoidCallback onPause;
   final bool isProcessingMove;
+  final bool isDealing;
+  final double dealingProgress;
+  final bool soundEnabled;
+  final VoidCallback onToggleSound;
+  final bool animationsEnabled;
 
   const PlayingTable({
     super.key,
@@ -19,16 +26,131 @@ class PlayingTable extends StatelessWidget {
     required this.onCardSelected,
     required this.onPause,
     this.isProcessingMove = false,
+    this.isDealing = false,
+    this.dealingProgress = 1.0,
+    required this.soundEnabled,
+    required this.onToggleSound,
+    this.animationsEnabled = true,
   });
 
   @override
+  State<PlayingTable> createState() => _PlayingTableState();
+}
+
+class _PlayingTableState extends State<PlayingTable>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _passController;
+  late final Animation<double> _passCurve;
+
+  int _lastAnimatedTurnCount = 0;
+  int? _animatingPlayerIndex;
+  GameCard? _animatingDiscardedCard;
+  GameCard? _animatingTakenCard;
+
+  @override
+  void initState() {
+    super.initState();
+    _passController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 850),
+    );
+    _passCurve = CurvedAnimation(
+      parent: _passController,
+      curve: Curves.easeInOutCubic,
+    );
+    _lastAnimatedTurnCount = widget.state.turnCount;
+  }
+
+  @override
+  void didUpdateWidget(covariant PlayingTable oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.state.turnCount == 0) {
+      _lastAnimatedTurnCount = 0;
+      _animatingPlayerIndex = null;
+      _passController.reset();
+      return;
+    }
+
+    // Trigger 2D card passing animation when a new move occurs
+    if (widget.animationsEnabled &&
+        widget.state.turnCount > _lastAnimatedTurnCount &&
+        widget.state.lastMovePlayerIndex != null) {
+      _lastAnimatedTurnCount = widget.state.turnCount;
+      _animatingPlayerIndex = widget.state.lastMovePlayerIndex;
+      _animatingDiscardedCard = widget.state.lastDiscardedCard;
+      _animatingTakenCard = widget.state.lastTakenCard;
+      _passController.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _passController.dispose();
+    super.dispose();
+  }
+
+  /// Computes the 2D center anchor position for any player index (0 = bottom human, 1..N-1 = bots).
+  Offset _getPlayerAnchor({
+    required int playerIndex,
+    required int totalPlayers,
+    required double screenWidth,
+    required double screenHeight,
+  }) {
+    final topOffset = screenHeight < 600 ? 80.0 : 96.0;
+
+    if (playerIndex == 0) {
+      return Offset(screenWidth * 0.5, screenHeight - 90);
+    }
+
+    if (totalPlayers == 4) {
+      switch (playerIndex) {
+        case 1:
+          return Offset(85, screenHeight * 0.43);
+        case 2:
+          return Offset(screenWidth * 0.5, topOffset);
+        case 3:
+          return Offset(screenWidth - 85, screenHeight * 0.43);
+      }
+    } else if (totalPlayers == 5) {
+      switch (playerIndex) {
+        case 1:
+          return Offset(80, screenHeight * 0.45);
+        case 2:
+          return Offset(screenWidth * 0.28, topOffset);
+        case 3:
+          return Offset(screenWidth * 0.72, topOffset);
+        case 4:
+          return Offset(screenWidth - 80, screenHeight * 0.45);
+      }
+    } else {
+      switch (playerIndex) {
+        case 1:
+          return Offset(80, screenHeight * 0.66);
+        case 2:
+          return Offset(85, topOffset);
+        case 3:
+          return Offset(screenWidth * 0.5, topOffset);
+        case 4:
+          return Offset(screenWidth - 85, topOffset);
+        case 5:
+          return Offset(screenWidth - 80, screenHeight * 0.66);
+      }
+    }
+    return Offset(screenWidth * 0.5, screenHeight * 0.5);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final state = widget.state;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final screenWidth = constraints.maxWidth;
         final screenHeight = constraints.maxHeight;
+        final tableCenter = Offset(screenWidth * 0.5, screenHeight * 0.46);
 
-        // Card sizing strictly following 2:1 ratio from CardDimensions
+        // Card sizing strictly following 2:1 ratio
         final handCardSize = CardDimensions.getHumanHandCardSize(
           screenWidth: screenWidth,
           screenHeight: screenHeight,
@@ -51,22 +173,22 @@ class PlayingTable extends StatelessWidget {
               center: Alignment.center,
               radius: 1.1,
               colors: [
-                Color(0xFF0F3B2C), // Center felt green
+                Color(0xFF0F3B2C),
                 Color(0xFF09251B),
-                Color(0xFF04140E), // Vignette edges
+                Color(0xFF04140E),
               ],
             ),
           ),
           child: Stack(
             children: [
-              // Subtle table felt felt texture & golden border
+              // Decorative table felt border and center rings
               Positioned.fill(
                 child: CustomPaint(
                   painter: TableFeltPainter(),
                 ),
               ),
 
-              // Top HUD Bar: Game status, turn info, and pause button
+              // Top HUD Bar: Turn badge ("Your Turn" for human), goal badge, status, Sound toggle, and Pause
               Positioned(
                 top: 0,
                 left: 0,
@@ -74,8 +196,12 @@ class PlayingTable extends StatelessWidget {
                 child: _buildTopHud(context),
               ),
 
-              // Central Table Area: Dais & Central Table Card
-              Center(
+              // Central Table Card Area (Classic single upright centered style)
+              Positioned(
+                left: tableCenter.dx - (tableCardSize.width + 32) / 2,
+                top: tableCenter.dy - (tableCardSize.height + 54) / 2,
+                width: tableCardSize.width + 32,
+                height: tableCardSize.height + 54,
                 child: _buildCentralTableArea(context, tableCardSize),
               ),
 
@@ -85,6 +211,31 @@ class PlayingTable extends StatelessWidget {
                 screenWidth: screenWidth,
                 screenHeight: screenHeight,
               ),
+
+              // 2D Card Passing Animation Overlay
+              if (_animatingPlayerIndex != null)
+                AnimatedBuilder(
+                  animation: _passCurve,
+                  builder: (context, _) {
+                    if (!_passController.isAnimating) {
+                      return const SizedBox.shrink();
+                    }
+                    return _buildPassingCardsOverlay(
+                      screenWidth: screenWidth,
+                      screenHeight: screenHeight,
+                      tableCenter: tableCenter,
+                      tableCardSize: tableCardSize,
+                    );
+                  },
+                ),
+
+              // Initial Shuffling & Dealing Animation Overlay
+              if (widget.isDealing)
+                _buildDealingOverlay(
+                  screenWidth: screenWidth,
+                  screenHeight: screenHeight,
+                  tableCenter: tableCenter,
+                ),
 
               // Human Player Hand Area at Bottom
               Positioned(
@@ -105,13 +256,14 @@ class PlayingTable extends StatelessWidget {
   }
 
   Widget _buildTopHud(BuildContext context) {
+    final state = widget.state;
     final activePlayer = state.currentPlayer;
     final isHuman = activePlayer.isHuman;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.4),
+        color: Colors.black.withValues(alpha: 0.45),
         border: Border(
           bottom: BorderSide(
             color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
@@ -123,14 +275,14 @@ class PlayingTable extends StatelessWidget {
         bottom: false,
         child: Row(
           children: [
-            // Turn Badge
+            // Turn Badge: "Your Turn" for human player, "<Bot Name>'s Turn" for bots
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
               decoration: BoxDecoration(
                 color: isHuman
-                    ? const Color(0xFF059669).withValues(alpha: 0.85)
-                    : const Color(0xFF1E293B).withValues(alpha: 0.85),
-                borderRadius: BorderRadius.circular(6),
+                    ? const Color(0xFF059669).withValues(alpha: 0.9)
+                    : const Color(0xFF1E293B).withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(7),
                 border: Border.all(
                   color: isHuman ? const Color(0xFFFFD54F) : Colors.white24,
                   width: 1,
@@ -140,21 +292,42 @@ class PlayingTable extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    isHuman ? Icons.person : Icons.smart_toy,
+                    isHuman ? Icons.person : Icons.sync_alt,
                     color: Colors.white,
                     size: 14,
                   ),
                   const SizedBox(width: 5),
                   Text(
-                    isHuman ? 'YOUR TURN' : '${activePlayer.name}\'s Turn',
+                    isHuman ? 'Your Turn' : '${activePlayer.name}\'s Turn',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
+                      letterSpacing: 0.4,
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // Dynamic Winning Set Size Indicator Pill
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD97706).withValues(alpha: 0.22),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: const Color(0xFFFFD54F).withValues(alpha: 0.45),
+                ),
+              ),
+              child: Text(
+                'Goal: ${state.totalPlayers}×',
+                style: const TextStyle(
+                  color: Color(0xFFFFE082),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -162,7 +335,9 @@ class PlayingTable extends StatelessWidget {
             // Status message
             Expanded(
               child: Text(
-                state.statusMessage,
+                widget.isDealing
+                    ? 'Shuffling & dealing balanced hands (1 of each country)...'
+                    : state.statusMessage,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -173,14 +348,30 @@ class PlayingTable extends StatelessWidget {
               ),
             ),
 
+            // Dedicated HUD Sound On/Off Toggle Button
+            IconButton(
+              icon: Icon(
+                widget.soundEnabled
+                    ? Icons.volume_up_rounded
+                    : Icons.volume_off_rounded,
+                color: widget.soundEnabled
+                    ? const Color(0xFFFFD54F)
+                    : Colors.white54,
+                size: 22,
+              ),
+              tooltip: widget.soundEnabled ? 'Mute Sound' : 'Enable Sound',
+              onPressed: widget.onToggleSound,
+            ),
+
             // Pause / Menu button
             IconButton(
-              icon: const Icon(Icons.pause, color: Color(0xFFFFD54F)),
+              icon: const Icon(
+                Icons.pause_rounded,
+                color: Color(0xFFFFD54F),
+                size: 22,
+              ),
               tooltip: 'Game Menu',
-              onPressed: () {
-                AudioService.instance.playButtonClick();
-                onPause();
-              },
+              onPressed: widget.onPause,
             ),
           ],
         ),
@@ -189,69 +380,244 @@ class PlayingTable extends StatelessWidget {
   }
 
   Widget _buildCentralTableArea(BuildContext context, Size cardSize) {
+    final state = widget.state;
     final tableCard = state.tableCard;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Table Dais / Pedestal
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: const Color(0xFFFFD700).withValues(alpha: 0.4),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFFFD700).withValues(alpha: 0.15),
-                blurRadius: 25,
-                spreadRadius: 2,
-              ),
-            ],
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.32),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: const Color(0xFFD4AF37).withValues(alpha: 0.6),
+            width: 1.2,
           ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: const Color(0xFFD4AF37).withValues(alpha: 0.6),
-                width: 1.2,
-              ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFFFD700).withValues(alpha: 0.14),
+              blurRadius: 20,
+              spreadRadius: 1,
             ),
-            child: Column(
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
+                Icon(
+                  tableCard.isStartingCard
+                      ? Icons.public
+                      : Icons.table_restaurant,
+                  color: const Color(0xFFFFD54F),
+                  size: 12,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  state.isOpeningMove ? 'STARTER CARD' : 'TABLE CARD',
+                  style: const TextStyle(
+                    color: Color(0xFFFFD54F),
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              transitionBuilder: (child, animation) {
+                return ScaleTransition(
+                  scale: CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutBack,
+                  ),
+                  child: FadeTransition(opacity: animation, child: child),
+                );
+              },
+              child: CountryCardView(
+                key: ValueKey<String>(tableCard.id),
+                card: tableCard,
+                width: cardSize.width,
+                height: cardSize.height,
+                isLegal: true,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Renders smooth 2D arc trajectories for cards moving between players and the center table.
+  Widget _buildPassingCardsOverlay({
+    required double screenWidth,
+    required double screenHeight,
+    required Offset tableCenter,
+    required Size tableCardSize,
+  }) {
+    final t = _passCurve.value;
+    final playerIdx = _animatingPlayerIndex!;
+    final playerAnchor = _getPlayerAnchor(
+      playerIndex: playerIdx,
+      totalPlayers: widget.state.totalPlayers,
+      screenWidth: screenWidth,
+      screenHeight: screenHeight,
+    );
+
+    // 2D parabolic arc offset perpendicular to the path
+    final arcLift = math.sin(math.pi * t) * 34.0;
+
+    // 1. Discarded card: moves from playerAnchor -> tableCenter
+    final discardPos = Offset.lerp(playerAnchor, tableCenter, t)! +
+        Offset(arcLift * 0.6, -arcLift);
+
+    // 2. Taken card: moves from tableCenter -> playerAnchor
+    final takePos = Offset.lerp(tableCenter, playerAnchor, t)! +
+        Offset(-arcLift * 0.6, arcLift * 0.5);
+
+    final movingWidth = tableCardSize.width * 0.85;
+    final movingHeight = movingWidth * 2.0;
+
+    return IgnorePointer(
+      child: Stack(
+        children: [
+          // Taken card moving from table to player's hand
+          if (_animatingTakenCard != null)
+            Positioned(
+              left: takePos.dx - movingWidth / 2,
+              top: takePos.dy - movingHeight / 2,
+              child: Opacity(
+                opacity: (1.0 - t * 0.35).clamp(0.0, 1.0),
+                child: Transform.rotate(
+                  angle: (1.0 - t) * 0.14,
+                  child: playerIdx == 0
+                      ? CountryCardView(
+                          card: _animatingTakenCard!,
+                          width: movingWidth,
+                          height: movingHeight,
+                        )
+                      : CardBackView(
+                          width: movingWidth * 0.78,
+                        ),
+                ),
+              ),
+            ),
+
+          // Discarded card moving from player's hand to center table
+          if (_animatingDiscardedCard != null)
+            Positioned(
+              left: discardPos.dx - movingWidth / 2,
+              top: discardPos.dy - movingHeight / 2,
+              child: Opacity(
+                opacity: (0.3 + t * 0.7).clamp(0.0, 1.0),
+                child: Transform.rotate(
+                  angle: math.sin(math.pi * t) * -0.16,
+                  child: CountryCardView(
+                    card: _animatingDiscardedCard!,
+                    width: movingWidth,
+                    height: movingHeight,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Renders the initial shuffling and balanced hand dealing animation from center deck to all seats.
+  Widget _buildDealingOverlay({
+    required double screenWidth,
+    required double screenHeight,
+    required Offset tableCenter,
+  }) {
+    final state = widget.state;
+    final n = state.totalPlayers;
+    final p = widget.dealingProgress.clamp(0.0, 1.0);
+
+    final flyingCards = <Widget>[];
+
+    for (int playerIdx = 0; playerIdx < n; playerIdx++) {
+      final seatTarget = _getPlayerAnchor(
+        playerIndex: playerIdx,
+        totalPlayers: n,
+        screenWidth: screenWidth,
+        screenHeight: screenHeight,
+      );
+
+      for (int c = 0; c < n; c++) {
+        final delay = (c * n + playerIdx) / (n * n * 1.4);
+        final localT = ((p - delay) / 0.45).clamp(0.0, 1.0);
+        if (localT <= 0.0 || localT >= 1.0) continue;
+
+        final curvedT = Curves.easeOutCubic.transform(localT);
+        final pos = Offset.lerp(tableCenter, seatTarget, curvedT)!;
+
+        flyingCards.add(
+          Positioned(
+            left: pos.dx - 18,
+            top: pos.dy - 36,
+            child: Transform.rotate(
+              angle: (1.0 - curvedT) * 0.4,
+              child: const CardBackView(width: 36),
+            ),
+          ),
+        );
+      }
+    }
+
+    return IgnorePointer(
+      child: Stack(
+        children: [
+          ...flyingCards,
+          Positioned(
+            top: 56,
+            left: 20,
+            right: 20,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.94),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: const Color(0xFFFFD700),
+                    width: 1.2,
+                  ),
+                ),
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.table_restaurant, color: Color(0xFFFFD54F), size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      state.isOpeningMove ? 'STARTING CARD' : 'TABLE CARD',
-                      style: const TextStyle(
-                        color: Color(0xFFFFD54F),
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
+                    const Icon(
+                      Icons.style,
+                      color: Color(0xFFFFD54F),
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Dealing Balanced Hands • 1 Card of Each Country (${state.totalPlayers} Cards/Player)',
+                        style: const TextStyle(
+                          color: Color(0xFFFFE082),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                CountryCardView(
-                  card: tableCard,
-                  width: cardSize.width,
-                  height: cardSize.height,
-                  isLegal: true,
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -261,20 +627,17 @@ class PlayingTable extends StatelessWidget {
     required double screenHeight,
   }) {
     final widgets = <Widget>[];
-    final totalPlayers = state.totalPlayers;
-    final topOffset = screenHeight < 600 ? 50.0 : 65.0;
+    final totalPlayers = widget.state.totalPlayers;
+    final topOffset = screenHeight < 600 ? 48.0 : 56.0;
 
     if (totalPlayers == 4) {
-      // 3 opponents: Left (p1), Top (p2), Right (p3)
-      // Bot 1: Left
       widgets.add(
         Positioned(
           left: 14,
-          top: screenHeight * 0.38,
+          top: screenHeight * 0.36,
           child: _seatWidget(opponentPlayers[0]),
         ),
       );
-      // Bot 2: Top
       widgets.add(
         Positioned(
           top: topOffset,
@@ -282,51 +645,43 @@ class PlayingTable extends StatelessWidget {
           child: _seatWidget(opponentPlayers[1]),
         ),
       );
-      // Bot 3: Right
       widgets.add(
         Positioned(
           right: 14,
-          top: screenHeight * 0.38,
+          top: screenHeight * 0.36,
           child: _seatWidget(opponentPlayers[2]),
         ),
       );
     } else if (totalPlayers == 5) {
-      // 4 opponents: Mid-Left, Top-Left, Top-Right, Mid-Right
-      // Bot 1: Mid-Left
       widgets.add(
         Positioned(
           left: 12,
-          top: screenHeight * 0.40,
+          top: screenHeight * 0.38,
           child: _seatWidget(opponentPlayers[0], isCompact: true),
         ),
       );
-      // Bot 2: Top-Left
       widgets.add(
         Positioned(
           top: topOffset,
-          left: screenWidth * 0.22,
+          left: screenWidth * 0.20,
           child: _seatWidget(opponentPlayers[1], isCompact: true),
         ),
       );
-      // Bot 3: Top-Right
       widgets.add(
         Positioned(
           top: topOffset,
-          right: screenWidth * 0.22,
+          right: screenWidth * 0.20,
           child: _seatWidget(opponentPlayers[2], isCompact: true),
         ),
       );
-      // Bot 4: Mid-Right
       widgets.add(
         Positioned(
           right: 12,
-          top: screenHeight * 0.40,
+          top: screenHeight * 0.38,
           child: _seatWidget(opponentPlayers[3], isCompact: true),
         ),
       );
     } else {
-      // 6 players -> 5 opponents:
-      // Bot 1: Bottom-Left
       widgets.add(
         Positioned(
           left: 12,
@@ -334,7 +689,6 @@ class PlayingTable extends StatelessWidget {
           child: _seatWidget(opponentPlayers[0], isCompact: true),
         ),
       );
-      // Bot 2: Top-Left
       widgets.add(
         Positioned(
           left: 14,
@@ -342,15 +696,13 @@ class PlayingTable extends StatelessWidget {
           child: _seatWidget(opponentPlayers[1], isCompact: true),
         ),
       );
-      // Bot 3: Top-Center
       widgets.add(
         Positioned(
           top: topOffset,
-          left: screenWidth * 0.5 - 65,
+          left: screenWidth * 0.5 - 66,
           child: _seatWidget(opponentPlayers[2], isCompact: true),
         ),
       );
-      // Bot 4: Top-Right
       widgets.add(
         Positioned(
           right: 14,
@@ -358,7 +710,6 @@ class PlayingTable extends StatelessWidget {
           child: _seatWidget(opponentPlayers[3], isCompact: true),
         ),
       );
-      // Bot 5: Bottom-Right
       widgets.add(
         Positioned(
           right: 12,
@@ -372,7 +723,9 @@ class PlayingTable extends StatelessWidget {
   }
 
   Widget _seatWidget(GamePlayer player, {bool isCompact = false}) {
-    final isCurrentTurn = state.currentTurnPlayerIndex == player.id;
+    final state = widget.state;
+    final isCurrentTurn =
+        !widget.isDealing && state.currentTurnPlayerIndex == player.id;
     final isThinking = isCurrentTurn && !player.isHuman && !state.isGameOver;
 
     return PlayerSeat(
@@ -388,7 +741,11 @@ class PlayingTable extends StatelessWidget {
     required GamePlayer humanPlayer,
     required Size cardSize,
   }) {
-    final isHumanTurn = state.isHumanTurn;
+    final state = widget.state;
+    final isHumanTurn = !widget.isDealing && state.isHumanTurn;
+    final handRevealProgress = widget.isDealing
+        ? ((widget.dealingProgress - 0.25) / 0.75).clamp(0.0, 1.0)
+        : 1.0;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -396,41 +753,47 @@ class PlayingTable extends StatelessWidget {
         // Helper hint when it's human's turn
         if (isHumanTurn)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             margin: const EdgeInsets.only(bottom: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFFD97706).withValues(alpha: 0.9),
+              color: const Color(0xFFD97706).withValues(alpha: 0.92),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.white70, width: 0.8),
             ),
             child: Text(
               state.isOpeningMove
-                  ? 'Opening Move: Tap any card to place on table and take Starting Card'
-                  : 'Tap a legal card to discard onto the table and take ${state.tableCard.displayName}',
+                  ? 'Opening Move: Tap any card to place on the table and take Global'
+                  : 'Tap a legal card to pass to the table and take ${state.tableCard.displayName}',
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 10,
+                fontSize: 10.5,
                 fontWeight: FontWeight.bold,
               ),
             ),
           ),
 
-        // Hand cards row
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              for (final card in humanPlayer.hand)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: _buildHumanCard(
-                    card: card,
-                    isHumanTurn: isHumanTurn,
-                    cardSize: cardSize,
-                  ),
-                ),
-            ],
+        // Hand cards row with animated reveal during initial deal
+        Opacity(
+          opacity: handRevealProgress,
+          child: Transform.translate(
+            offset: Offset(0, (1.0 - handRevealProgress) * 28),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (final card in humanPlayer.hand)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: _buildHumanCard(
+                        card: card,
+                        isHumanTurn: isHumanTurn,
+                        cardSize: cardSize,
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ],
@@ -442,7 +805,7 @@ class PlayingTable extends StatelessWidget {
     required bool isHumanTurn,
     required Size cardSize,
   }) {
-    final isLegal = isHumanTurn && state.isLegalDiscard(card);
+    final isLegal = isHumanTurn && widget.state.isLegalDiscard(card);
 
     return CountryCardView(
       card: card,
@@ -450,10 +813,10 @@ class PlayingTable extends StatelessWidget {
       height: cardSize.height,
       isLegal: !isHumanTurn || isLegal,
       isSelected: false,
-      onTap: isLegal && !isProcessingMove
+      onTap: isLegal && !widget.isProcessingMove
           ? () {
               AudioService.instance.playCardTap();
-              onCardSelected(card);
+              widget.onCardSelected(card);
             }
           : null,
     );
@@ -465,7 +828,6 @@ class TableFeltPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final rect = Rect.fromLTWH(0, 0, size.width, size.height);
 
-    // Outer gold border inset
     final borderPaint = Paint()
       ..color = const Color(0xFFD4AF37).withValues(alpha: 0.22)
       ..style = PaintingStyle.stroke
@@ -475,6 +837,15 @@ class TableFeltPainter extends CustomPainter {
       RRect.fromRectAndRadius(rect.deflate(10), const Radius.circular(20)),
       borderPaint,
     );
+
+    final center = Offset(size.width / 2, size.height * 0.46);
+    final ringPaint = Paint()
+      ..color = const Color(0xFFD4AF37).withValues(alpha: 0.14)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    canvas.drawCircle(center, 110, ringPaint);
+    canvas.drawCircle(center, 85, ringPaint);
   }
 
   @override

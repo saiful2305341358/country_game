@@ -61,26 +61,24 @@ class InitialExchangeService {
       }
     }
 
-    // Phase 3: Western Names assignment with 50% Female and 50% Male balance
-    // Shuffle name pools so each game has fresh interesting names
+    // Phase 3: Clean realistic Western names with 50% Female and 50% Male balance
     final shuffledFemale = List<String>.from(westernFemaleNames)..shuffle(rng);
     final shuffledMale = List<String>.from(westernMaleNames)..shuffle(rng);
 
-    // Prepare bot profiles alternating female and male
     final botProfiles = <({String name, bool isFemale})>[];
     int fIndex = 0;
     int mIndex = 0;
 
     for (int b = 1; b < n; b++) {
-      final bool giveFemale = (b % 2 == 1); // Alternates Female, Male, Female...
+      final bool giveFemale = (b % 2 == 1);
       if (giveFemale) {
         botProfiles.add((
-          name: '${shuffledFemale[fIndex++ % shuffledFemale.length]} (Bot $b)',
+          name: shuffledFemale[fIndex++ % shuffledFemale.length],
           isFemale: true,
         ));
       } else {
         botProfiles.add((
-          name: '${shuffledMale[mIndex++ % shuffledMale.length]} (Bot $b)',
+          name: shuffledMale[mIndex++ % shuffledMale.length],
           isFemale: false,
         ));
       }
@@ -99,7 +97,7 @@ class InitialExchangeService {
       }
 
       final isHuman = (p == 0);
-      final playerName = isHuman ? 'You (Alex)' : botProfiles[p - 1].name;
+      final playerName = isHuman ? 'You' : botProfiles[p - 1].name;
       final isFemale = isHuman ? false : botProfiles[p - 1].isFemale;
 
       players.add(

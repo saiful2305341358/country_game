@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/game_settings.dart';
 import '../services/audio_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -10,23 +11,34 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   late bool _soundEnabled;
-  bool _animationsEnabled = true;
-  int _botDelayMs = 800;
+  late bool _animationsEnabled;
+  late int _botDelayMs;
 
   @override
   void initState() {
     super.initState();
     _soundEnabled = AudioService.instance.isSoundEnabled;
+    _animationsEnabled = GameSettings.current.animationsEnabled;
+    _botDelayMs = GameSettings.current.botDelayMs;
+  }
+
+  void _syncSettings() {
+    GameSettings.current = GameSettings.current.copyWith(
+      soundEnabled: _soundEnabled,
+      animationsEnabled: _animationsEnabled,
+      botDelayMs: _botDelayMs,
+    );
   }
 
   void _resetToDefaults() {
-    AudioService.instance.playButtonClick();
     setState(() {
       _soundEnabled = true;
       AudioService.instance.isSoundEnabled = true;
       _animationsEnabled = true;
-      _botDelayMs = 800;
+      _botDelayMs = 1650;
+      _syncSettings();
     });
+    AudioService.instance.playButtonClick();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Settings restored to defaults'),
@@ -43,10 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFFFFD54F)),
-          onPressed: () {
-            AudioService.instance.playButtonClick();
-            Navigator.pop(context);
-          },
+          onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Settings',
@@ -94,18 +103,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               style: TextStyle(color: Colors.white, fontSize: 13),
                             ),
                             subtitle: const Text(
-                              'Clicks, felt placement, card takes, exchange and victory chimes',
-                              style: TextStyle(color: Colors.white60, fontSize: 10.5),
+                              'Soft wooden taps, subtle card slides, and victory chimes during matches',
+                              style: TextStyle(
+                                color: Colors.white60,
+                                fontSize: 10.5,
+                              ),
                             ),
-                            secondary: const Icon(Icons.volume_up, color: Color(0xFFFFD54F)),
+                            secondary: Icon(
+                              _soundEnabled
+                                  ? Icons.volume_up_rounded
+                                  : Icons.volume_off_rounded,
+                              color: const Color(0xFFFFD54F),
+                            ),
                             value: _soundEnabled,
                             activeTrackColor: const Color(0xFFFFD54F),
                             onChanged: (val) {
                               setState(() {
                                 _soundEnabled = val;
                                 AudioService.instance.isSoundEnabled = val;
+                                _syncSettings();
                               });
                               if (val) {
+                                // Audible confirmation feedback when testing switch
                                 AudioService.instance.playCardTap();
                               }
                             },
@@ -129,15 +148,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               style: TextStyle(color: Colors.white, fontSize: 13),
                             ),
                             subtitle: const Text(
-                              'Subtle card lift, highlight aura, and hover transitions',
-                              style: TextStyle(color: Colors.white60, fontSize: 10.5),
+                              'Initial card dealing animation and 2D card passing trajectories',
+                              style: TextStyle(
+                                color: Colors.white60,
+                                fontSize: 10.5,
+                              ),
                             ),
-                            secondary: const Icon(Icons.animation, color: Color(0xFFFFD54F)),
+                            secondary: const Icon(
+                              Icons.animation,
+                              color: Color(0xFFFFD54F),
+                            ),
                             value: _animationsEnabled,
                             activeTrackColor: const Color(0xFFFFD54F),
                             onChanged: (val) {
-                              AudioService.instance.playButtonClick();
-                              setState(() => _animationsEnabled = val);
+                              setState(() {
+                                _animationsEnabled = val;
+                                _syncSettings();
+                              });
                             },
                           ),
                         ),
@@ -145,7 +172,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            const Icon(Icons.speed, color: Color(0xFFFFD54F), size: 22),
+                            const Icon(
+                              Icons.speed,
+                              color: Color(0xFFFFD54F),
+                              size: 22,
+                            ),
                             const SizedBox(width: 14),
                             Expanded(
                               child: Column(
@@ -153,14 +184,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 children: [
                                   const Text(
                                     'Bot Thinking Pace',
-                                    style: TextStyle(color: Colors.white, fontSize: 13),
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                    ),
                                   ),
                                   Text(
-                                    _botDelayMs == 400
-                                        ? 'Fast (400ms)'
-                                        : _botDelayMs == 800
-                                            ? 'Normal (800ms)'
-                                            : 'Relaxed (1400ms)',
+                                    _botDelayMs <= 1100
+                                        ? 'Fast (1100ms)'
+                                        : _botDelayMs <= 1650
+                                            ? 'Normal (1650ms)'
+                                            : 'Relaxed (2300ms)',
                                     style: const TextStyle(
                                       color: Color(0xFFFFD54F),
                                       fontSize: 11,
@@ -174,11 +208,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         const SizedBox(height: 10),
                         Row(
                           children: [
-                            _buildPaceButton('Fast', 400),
+                            _buildPaceButton('Fast', 1100),
                             const SizedBox(width: 8),
-                            _buildPaceButton('Normal', 800),
+                            _buildPaceButton('Normal', 1650),
                             const SizedBox(width: 8),
-                            _buildPaceButton('Relaxed', 1400),
+                            _buildPaceButton('Relaxed', 2300),
                           ],
                         ),
                       ],
@@ -218,8 +252,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Expanded(
       child: GestureDetector(
         onTap: () {
-          AudioService.instance.playButtonClick();
-          setState(() => _botDelayMs = ms);
+          setState(() {
+            _botDelayMs = ms;
+            _syncSettings();
+          });
         },
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 8),

@@ -35,6 +35,9 @@ class AudioService implements AudioServiceInterface {
   void playGameStart() => _platformService.playGameStart();
 
   @override
+  void playGameEnd() => _platformService.playGameEnd();
+
+  @override
   void playVictory() => _platformService.playVictory();
 
   @override

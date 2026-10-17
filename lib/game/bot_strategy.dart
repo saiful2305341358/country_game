@@ -8,12 +8,13 @@ class BotStrategy {
   ///
   /// Guarantees:
   /// - Only selects strictly legal moves.
-  /// - Treats Starting Card as neutral.
+  /// - Treats Starting Card ("Total World") as neutral.
   /// - Never accesses hidden opponent hands.
-  /// - Protects sets of 2 or 3 of the same country.
+  /// - Targets collecting N cards of the same country (where N = state.totalPlayers).
   static GameCard chooseDiscard({required GameState state}) {
     final bot = state.currentPlayer;
     final hand = bot.hand;
+    final winningSetSize = state.totalPlayers;
 
     // Filter strictly legal cards
     final legalCards = hand.where((card) {
@@ -34,8 +35,6 @@ class BotStrategy {
       return legalCards.first;
     }
 
-    // 1. Analyze simulated new hand after taking table card
-    // The table card will enter bot's hand, while the discarded card will leave.
     final tableCard = state.tableCard;
     final typeCountsInHand = bot.ordinaryTypeCounts;
 
@@ -65,24 +64,26 @@ class BotStrategy {
       double score = 0.0;
 
       if (candidate.isStartingCard) {
-        // Discarding starting card is often very good if bot is building a country set,
-        // because starting card cannot win.
-        score += 50.0;
+        // Discarding starting card is strongly favored when building a country set,
+        // because the starting card cannot contribute to an N-card country victory.
+        score += 80.0;
       } else {
         final cType = candidate.type!;
         final count = typeCountsInHand[cType] ?? 0;
 
         if (cType == targetType) {
-          // Severely penalize discarding our primary target
+          // Severely penalize discarding our primary target country
           score -= 500.0 * count;
         } else {
-          // Prefer discarding types where we only have 1 card
+          // Prefer discarding singletons over pairs or larger sets
           if (count == 1) {
-            score += 100.0;
+            score += 120.0;
           } else if (count == 2) {
-            score += 20.0; // Moderate reluctance to break a pair
+            score += 20.0;
+          } else if (count >= winningSetSize - 1) {
+            score -= 400.0; // Never break a set 1 card away from winning
           } else if (count >= 3) {
-            score -= 200.0; // High reluctance to break a triple
+            score -= 220.0;
           }
         }
 

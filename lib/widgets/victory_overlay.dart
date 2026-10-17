@@ -7,6 +7,7 @@ import 'country_card_view.dart';
 class VictoryOverlay extends StatelessWidget {
   final GamePlayer winner;
   final CountryType winningType;
+  final int totalPlayers;
   final int turnCount;
   final VoidCallback onPlayAgain;
   final VoidCallback onMainMenu;
@@ -15,6 +16,7 @@ class VictoryOverlay extends StatelessWidget {
     super.key,
     required this.winner,
     required this.winningType,
+    required this.totalPlayers,
     required this.turnCount,
     required this.onPlayAgain,
     required this.onMainMenu,
@@ -23,11 +25,12 @@ class VictoryOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHuman = winner.isHuman;
+    final cardWidth = totalPlayers >= 6 ? 46.0 : (totalPlayers == 5 ? 52.0 : 58.0);
 
     return Center(
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 24),
-        constraints: const BoxConstraints(maxWidth: 420),
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        constraints: const BoxConstraints(maxWidth: 460),
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: const Color(0xFF0F172A).withValues(alpha: 0.96),
@@ -83,7 +86,9 @@ class VictoryOverlay extends StatelessWidget {
             Text(
               isHuman ? 'VICTORY!' : 'GAME OVER',
               style: TextStyle(
-                color: isHuman ? const Color(0xFFFFD700) : const Color(0xFFFFB74D),
+                color: isHuman
+                    ? const Color(0xFFFFD700)
+                    : const Color(0xFFFFB74D),
                 fontSize: 24,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 2,
@@ -92,63 +97,66 @@ class VictoryOverlay extends StatelessWidget {
 
             const SizedBox(height: 6),
 
-            // Winner description
+            // Dynamic Winner Description
             Text(
               isHuman
-                  ? 'Congratulations! You collected 4 cards of ${winningType.displayName}!'
-                  : '${winner.name} was first to collect 4 cards of ${winningType.displayName}!',
+                  ? 'You were the sole winner to collect all $totalPlayers cards of ${winningType.displayName}!'
+                  : '${winner.name} was the sole winner to collect all $totalPlayers cards of ${winningType.displayName}!',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 13,
+                fontSize: 13.5,
                 fontWeight: FontWeight.w500,
               ),
             ),
 
             const SizedBox(height: 16),
 
-            // 4 Winning Cards row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                for (int i = 0; i < 4; i++)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 3),
-                    child: CountryCardView(
-                      card: GameCard.ordinary(
-                        id: 'win_preview_$i',
-                        type: winningType,
+            // Dynamic N Winning Cards Row
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (int i = 0; i < totalPlayers; i++)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: CountryCardView(
+                        card: GameCard.ordinary(
+                          id: 'win_preview_$i',
+                          type: winningType,
+                        ),
+                        width: cardWidth,
                       ),
-                      width: 60,
-                      height: 84,
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
 
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
 
-            // Stats badge
+            // Dynamic Stats Badge: ${playerCount}× [Country Name]
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Colors.white12),
               ),
               child: Text(
-                'Total Turns: $turnCount  •  Winning Set: 4x ${winningType.shortCode}',
+                'Total Turns: $turnCount  •  Winning Set: $totalPlayers× ${winningType.displayName}',
+                textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Color(0xFFFFE082),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
 
             const SizedBox(height: 22),
 
-            // Buttons: Play Again & Main Menu
+            // Action Buttons: Main Menu & Play Again
             Row(
               children: [
                 Expanded(

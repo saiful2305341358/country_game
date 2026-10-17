@@ -18,6 +18,11 @@ class GameState {
   final String statusMessage;
   final List<String> moveLog;
 
+  /// Metadata for the most recent card exchange to drive 2D table animations.
+  final int? lastMovePlayerIndex;
+  final GameCard? lastTakenCard;
+  final GameCard? lastDiscardedCard;
+
   const GameState({
     required this.totalPlayers,
     required this.activeTypes,
@@ -31,6 +36,9 @@ class GameState {
     this.winningType,
     required this.statusMessage,
     this.moveLog = const [],
+    this.lastMovePlayerIndex,
+    this.lastTakenCard,
+    this.lastDiscardedCard,
   });
 
   bool get isGameOver => winner != null;
@@ -38,6 +46,9 @@ class GameState {
   GamePlayer get currentPlayer => players[currentTurnPlayerIndex];
 
   bool get isHumanTurn => !isGameOver && currentPlayer.isHuman;
+
+  /// Dynamic winning set size equals totalPlayers (N).
+  int get winningSetSize => totalPlayers;
 
   bool isLegalDiscard(GameCard candidate) {
     if (isGameOver) return false;
@@ -76,6 +87,9 @@ class GameState {
     CountryType? winningType,
     String? statusMessage,
     List<String>? moveLog,
+    int? lastMovePlayerIndex,
+    GameCard? lastTakenCard,
+    GameCard? lastDiscardedCard,
   }) {
     return GameState(
       totalPlayers: totalPlayers ?? this.totalPlayers,
@@ -91,6 +105,9 @@ class GameState {
       winningType: winningType ?? this.winningType,
       statusMessage: statusMessage ?? this.statusMessage,
       moveLog: moveLog ?? this.moveLog,
+      lastMovePlayerIndex: lastMovePlayerIndex ?? this.lastMovePlayerIndex,
+      lastTakenCard: lastTakenCard ?? this.lastTakenCard,
+      lastDiscardedCard: lastDiscardedCard ?? this.lastDiscardedCard,
     );
   }
 }

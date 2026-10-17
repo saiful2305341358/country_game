@@ -33,10 +33,10 @@ class GameCard {
   }
 
   String get displayName =>
-      isStartingCard ? 'Starting Card' : (type?.displayName ?? 'Unknown');
+      isStartingCard ? 'Global' : (type?.displayName ?? 'Unknown');
 
   String get nativeName =>
-      isStartingCard ? 'Astrolabe' : (type?.nativeName ?? '');
+      isStartingCard ? 'Global' : (type?.nativeName ?? '');
 
   @override
   bool operator ==(Object other) =>

@@ -38,17 +38,26 @@ class GamePlayer {
     return counts;
   }
 
-  CountryType? get winningType {
+  /// Dynamic Winning Rule:
+  /// Winning Set Size = Total Number of Players (N), which matches [requiredSetSize]
+  /// (or the player's full hand size N when not explicitly passed).
+  CountryType? getWinningType({int? requiredSetSize}) {
+    final target = (requiredSetSize != null && requiredSetSize > 0)
+        ? requiredSetSize
+        : (hand.isNotEmpty ? hand.length : 4);
     final counts = ordinaryTypeCounts;
     for (final entry in counts.entries) {
-      if (entry.value >= 4) {
+      if (entry.value >= target) {
         return entry.key;
       }
     }
     return null;
   }
 
-  bool get hasWon => winningType != null;
+  CountryType? get winningType => getWinningType();
+
+  bool hasWon({int? requiredSetSize}) =>
+      getWinningType(requiredSetSize: requiredSetSize) != null;
 
   GamePlayer copyWith({
     int? id,
@@ -75,8 +84,4 @@ class GamePlayer {
 
   @override
   int get hashCode => id.hashCode;
-
-  @override
-  String toString() =>
-      'GamePlayer(id=$id, name=$name, isHuman=$isHuman, hand=${hand.length})';
 }

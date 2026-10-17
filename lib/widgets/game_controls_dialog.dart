@@ -24,6 +24,13 @@ class GameControlsDialog extends StatefulWidget {
 class _GameControlsDialogState extends State<GameControlsDialog> {
   bool _confirmRestart = false;
   bool _confirmMainMenu = false;
+  late bool _soundEnabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _soundEnabled = widget.soundEnabled;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,14 +59,14 @@ class _GameControlsDialogState extends State<GameControlsDialog> {
             // Header
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
+              children: const [
+                Icon(
                   Icons.pause_circle_filled,
                   color: Color(0xFFFFD54F),
                   size: 26,
                 ),
-                const SizedBox(width: 8),
-                const Text(
+                SizedBox(width: 8),
+                Text(
                   'GAME PAUSED',
                   style: TextStyle(
                     color: Color(0xFFFFE082),
@@ -85,7 +92,7 @@ class _GameControlsDialogState extends State<GameControlsDialog> {
                   Row(
                     children: [
                       Icon(
-                        widget.soundEnabled ? Icons.volume_up : Icons.volume_off,
+                        _soundEnabled ? Icons.volume_up : Icons.volume_off,
                         color: const Color(0xFFFFD54F),
                         size: 20,
                       ),
@@ -97,10 +104,10 @@ class _GameControlsDialogState extends State<GameControlsDialog> {
                     ],
                   ),
                   Switch(
-                    value: widget.soundEnabled,
+                    value: _soundEnabled,
                     activeTrackColor: const Color(0xFFFFD54F),
                     onChanged: (val) {
-                      AudioService.instance.playButtonClick();
+                      setState(() => _soundEnabled = val);
                       widget.onSoundToggle(val);
                     },
                   ),

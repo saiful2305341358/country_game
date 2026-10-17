@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../game/card_deck_factory.dart';
 import '../models/card_type.dart';
 import '../models/game_card.dart';
-import '../services/audio_service.dart';
 import '../widgets/country_card_view.dart';
 import 'game_screen.dart';
 
@@ -31,7 +30,6 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
 
   void _onPlayerCountChanged(int count) {
     if (_selectedPlayers == count) return;
-    AudioService.instance.playButtonClick();
     setState(() {
       _selectedPlayers = count;
       _activeTypes = CardDeckFactory.selectActiveTypes(count);
@@ -46,10 +44,7 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFFFFD54F)),
-          onPressed: () {
-            AudioService.instance.playButtonClick();
-            Navigator.pop(context);
-          },
+          onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Select Players',
@@ -86,7 +81,7 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Text(
-                      'TOTAL PLAYERS',
+                      'TOTAL PLAYERS & WINNING SET',
                       style: TextStyle(
                         color: Color(0xFFFFE082),
                         fontSize: 14,
@@ -96,9 +91,10 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Includes 1 Human Player + Computer Bots',
+                      'Win by collecting $_selectedPlayers cards of the same country (${_selectedPlayers * _selectedPlayers} country cards in deck)',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
+                        color: Colors.white.withValues(alpha: 0.78),
                         fontSize: 12,
                       ),
                     ),
@@ -108,11 +104,23 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
                     // Player Count Selector Cards (4, 5, 6)
                     Row(
                       children: [
-                        _buildPlayerCountOption(4, '4 Players', '1 Human + 3 Bots'),
+                        _buildPlayerCountOption(
+                          4,
+                          '4 Players',
+                          'Win Set: 4× Cards',
+                        ),
                         const SizedBox(width: 10),
-                        _buildPlayerCountOption(5, '5 Players', '1 Human + 4 Bots'),
+                        _buildPlayerCountOption(
+                          5,
+                          '5 Players',
+                          'Win Set: 5× Cards',
+                        ),
                         const SizedBox(width: 10),
-                        _buildPlayerCountOption(6, '6 Players', '1 Human + 5 Bots'),
+                        _buildPlayerCountOption(
+                          6,
+                          '6 Players',
+                          'Win Set: 6× Cards',
+                        ),
                       ],
                     ),
 
@@ -120,7 +128,10 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
 
                     // Active Countries Preview Header
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.35),
                         borderRadius: BorderRadius.circular(10),
@@ -150,15 +161,19 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
                             ],
                           ),
                           TextButton.icon(
-                            icon: const Icon(Icons.shuffle, size: 14, color: Color(0xFFFFD54F)),
+                            icon: const Icon(
+                              Icons.shuffle,
+                              size: 14,
+                              color: Color(0xFFFFD54F),
+                            ),
                             label: const Text(
                               'Reroll Set',
-                              style: TextStyle(color: Color(0xFFFFD54F), fontSize: 11),
+                              style: TextStyle(
+                                color: Color(0xFFFFD54F),
+                                fontSize: 11,
+                              ),
                             ),
-                            onPressed: () {
-                              AudioService.instance.playButtonClick();
-                              _refreshActiveTypes();
-                            },
+                            onPressed: _refreshActiveTypes,
                           ),
                         ],
                       ),
@@ -181,15 +196,15 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
                                   id: 'preview_${type.id}',
                                   type: type,
                                 ),
-                                width: 56,
-                                height: 112, // Exact 2:1 aspect ratio
+                                width: 58,
+                                height: 116,
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 type.shortCode,
                                 style: const TextStyle(
                                   color: Color(0xFFFFE082),
-                                  fontSize: 9,
+                                  fontSize: 9.5,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -221,10 +236,10 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           elevation: 6,
-                          shadowColor: const Color(0xFFD97706).withValues(alpha: 0.5),
+                          shadowColor:
+                              const Color(0xFFD97706).withValues(alpha: 0.5),
                         ),
                         onPressed: () {
-                          AudioService.instance.playGameStart();
                           Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(
@@ -302,8 +317,8 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
                 subtitle,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  fontSize: 8.5,
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 9,
                 ),
               ),
             ],

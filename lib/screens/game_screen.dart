@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../game/game_engine.dart';
 import '../models/card_type.dart';
 import '../models/game_card.dart';
+import '../models/game_settings.dart';
 import '../services/audio_service.dart';
 import '../widgets/game_controls_dialog.dart';
 import '../widgets/playing_table.dart';
@@ -21,44 +22,83 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> {
+class _GameScreenState extends State<GameScreen>
+    with SingleTickerProviderStateMixin {
   late final GameEngine _engine;
-  bool _showIntroBanner = true;
+  late final AnimationController _dealingController;
+
+  bool _isDealing = false;
+  int _lastTurnCount = 0;
 
   @override
   void initState() {
     super.initState();
-    _engine = GameEngine();
+    _engine = GameEngine(initialSettings: GameSettings.current);
     _engine.addListener(_onEngineUpdate);
+
+    _dealingController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1350),
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed && mounted) {
+          setState(() => _isDealing = false);
+          _engine.resumeActivePlay();
+        }
+      });
+
     _startMatch();
   }
 
   void _startMatch() {
+    final animateDeal = GameSettings.current.animationsEnabled;
+    _lastTurnCount = 0;
+
+    _engine.updateSettings(GameSettings.current);
     _engine.startNewGame(
       totalPlayers: widget.totalPlayers,
       predefinedTypes: widget.predefinedTypes,
+      deferBotStart: animateDeal,
     );
-    AudioService.instance.playExchange();
 
-    // Auto-dismiss the country matchup banner after 3.5 seconds
-    Future.delayed(const Duration(milliseconds: 3500), () {
-      if (mounted) {
-        setState(() => _showIntroBanner = false);
-      }
-    });
+    // Subtle, crisp startup chime on Game Start
+    AudioService.instance.playGameStart();
+
+    if (animateDeal) {
+      setState(() => _isDealing = true);
+      _dealingController.forward(from: 0.0);
+    } else {
+      setState(() => _isDealing = false);
+    }
   }
 
   void _onEngineUpdate() {
     if (!mounted) return;
-    setState(() {});
-
     final state = _engine.state;
-    if (state != null && state.isGameOver) {
-      AudioService.instance.playVictory();
+
+    if (state != null && state.turnCount > _lastTurnCount) {
+      final wasBotMove = state.lastMovePlayerIndex != null &&
+          state.lastMovePlayerIndex != 0;
+      _lastTurnCount = state.turnCount;
+
+      if (state.isGameOver) {
+        if (state.winner?.isHuman == true) {
+          // Charming, rewarding, uplifting sound when user wins
+          AudioService.instance.playVictory();
+        } else {
+          // Distinct audio cue signaling the round has concluded
+          AudioService.instance.playGameEnd();
+        }
+      } else if (wasBotMove) {
+        // Subtle wooden tap + slide feedback for bot card passing
+        AudioService.instance.playCardPlace();
+      }
     }
+
+    setState(() {});
   }
 
   void _onCardSelected(GameCard card) {
+    if (_isDealing) return;
     AudioService.instance.playCardTake();
     final success = _engine.makeMove(card);
     if (success) {
@@ -66,7 +106,21 @@ class _GameScreenState extends State<GameScreen> {
     }
   }
 
+  void _toggleSoundFromHud() {
+    final nextVal = !AudioService.instance.isSoundEnabled;
+    setState(() {
+      AudioService.instance.isSoundEnabled = nextVal;
+      GameSettings.current = GameSettings.current.copyWith(
+        soundEnabled: nextVal,
+      );
+    });
+    if (nextVal) {
+      AudioService.instance.playButtonClick();
+    }
+  }
+
   void _showPauseDialog() {
+    _engine.pauseActivePlay();
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -75,9 +129,20 @@ class _GameScreenState extends State<GameScreen> {
         onSoundToggle: (val) {
           setState(() {
             AudioService.instance.isSoundEnabled = val;
+            GameSettings.current = GameSettings.current.copyWith(
+              soundEnabled: val,
+            );
           });
+          if (val) {
+            AudioService.instance.playButtonClick();
+          }
         },
-        onResume: () => Navigator.pop(context),
+        onResume: () {
+          Navigator.pop(context);
+          if (!_isDealing) {
+            _engine.resumeActivePlay();
+          }
+        },
         onRestart: () {
           Navigator.pop(context);
           _startMatch();
@@ -93,6 +158,7 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   void dispose() {
+    _dealingController.dispose();
     _engine.removeListener(_onEngineUpdate);
     _engine.dispose();
     super.dispose();
@@ -112,72 +178,38 @@ class _GameScreenState extends State<GameScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // Main Table
-          PlayingTable(
-            state: state,
-            isProcessingMove: _engine.isProcessingMove,
-            onCardSelected: _onCardSelected,
-            onPause: _showPauseDialog,
+          // Main Playing Table with Dealing & Passing Animations
+          AnimatedBuilder(
+            animation: _dealingController,
+            builder: (context, _) {
+              return PlayingTable(
+                state: state,
+                isProcessingMove: _engine.isProcessingMove,
+                isDealing: _isDealing,
+                dealingProgress: _dealingController.value,
+                soundEnabled: AudioService.instance.isSoundEnabled,
+                onToggleSound: _toggleSoundFromHud,
+                animationsEnabled: GameSettings.current.animationsEnabled,
+                onCardSelected: _onCardSelected,
+                onPause: _showPauseDialog,
+              );
+            },
           ),
 
-          // Intro matchup banner at start
-          if (_showIntroBanner)
-            Positioned(
-              top: 50,
-              left: 20,
-              right: 20,
-              child: Center(
-                child: AnimatedOpacity(
-                  opacity: _showIntroBanner ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 300),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A).withValues(alpha: 0.94),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFFFD700), width: 1.2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.5),
-                          blurRadius: 12,
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.public, color: Color(0xFFFFD54F), size: 16),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Match Countries: ${state.activeTypes.map((t) => t.displayName).join(" • ")}',
-                          style: const TextStyle(
-                            color: Color(0xFFFFE082),
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
           // Victory Overlay
-          if (state.isGameOver && state.winner != null && state.winningType != null)
+          if (state.isGameOver &&
+              state.winner != null &&
+              state.winningType != null)
             Positioned.fill(
               child: Container(
                 color: Colors.black.withValues(alpha: 0.75),
                 child: VictoryOverlay(
                   winner: state.winner!,
                   winningType: state.winningType!,
+                  totalPlayers: state.totalPlayers,
                   turnCount: state.turnCount,
-                  onPlayAgain: () {
-                    AudioService.instance.playButtonClick();
-                    _startMatch();
-                  },
+                  onPlayAgain: _startMatch,
                   onMainMenu: () {
-                    AudioService.instance.playButtonClick();
                     _engine.leaveGame();
                     Navigator.pop(context);
                   },

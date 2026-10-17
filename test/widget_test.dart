@@ -6,14 +6,50 @@ import 'package:country_game/game/card_deck_factory.dart';
 import 'package:country_game/game/initial_exchange.dart';
 
 void main() {
-  testWidgets('Main menu renders game title and play button', (WidgetTester tester) async {
+  testWidgets('Main menu renders game title, dynamic tagline, and play button', (WidgetTester tester) async {
     await tester.pumpWidget(const CountryGameApp());
     await tester.pumpAndSettle();
 
     expect(find.text('COUNTRY GAME'), findsOneWidget);
+    expect(
+      find.text('Unite the Nations: Collect all cards of a country to conquer the round!'),
+      findsOneWidget,
+    );
     expect(find.text('PLAY GAME'), findsOneWidget);
     expect(find.text('SETTINGS'), findsOneWidget);
     expect(find.text('HOW TO PLAY & RULES'), findsOneWidget);
+  });
+
+  testWidgets('Bilingual Rules dialog toggles between English and Bangla with updated copy', (WidgetTester tester) async {
+    await tester.pumpWidget(const CountryGameApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('HOW TO PLAY & RULES'));
+    await tester.pumpAndSettle();
+
+    // Default English rules
+    expect(find.text('How to Play & Rules'), findsOneWidget);
+    expect(find.text('1. Core Goal — Unite One Country'), findsOneWidget);
+    expect(
+      find.textContaining('they are declared the sole winner and the game immediately ends!'),
+      findsOneWidget,
+    );
+    expect(find.text("3. Balanced Deal & 'Global' Starter Card"), findsOneWidget);
+
+    // Toggle to Bangla
+    await tester.tap(find.text('বাংলা'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('খেলার নিয়মাবলী'), findsOneWidget);
+    expect(find.text('১. মূল লক্ষ্য — একটি দেশের সব কার্ড সংগ্রহ'), findsOneWidget);
+    expect(
+      find.textContaining('যেকোনো একজন খেলোয়াড় একটি দেশের সব কার্ড একত্রিত করামাত্রই একক বিজয়ী ঘোষিত হবেন এবং খেলাটি সাথে সাথেই শেষ হয়ে যাবে।'),
+      findsOneWidget,
+    );
+
+    // Close dialog
+    await tester.tap(find.text('বুঝেছি!'));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('Navigation from MainMenu to PlayerSelectionScreen works', (WidgetTester tester) async {
@@ -64,7 +100,7 @@ void main() {
     expect(seatSize.height / seatSize.width, equals(2.0));
   });
 
-  test('Western player names have balanced 50% female and 50% male', () {
+  test('Western player names have balanced 50% female and 50% male and human is You', () {
     final deck4 = CardDeckFactory.createDeck(4);
     final players4 = InitialExchangeService.performInitialExchange(
       activeTypes: deck4.activeTypes,
@@ -75,6 +111,10 @@ void main() {
     final maleCount4 = players4.where((p) => !p.isFemale).length;
     expect(femaleCount4, equals(2));
     expect(maleCount4, equals(2));
+    expect(players4.first.name, equals('You'));
+    for (final p in players4) {
+      expect(p.name.contains('Bot'), isFalse);
+    }
 
     final deck6 = CardDeckFactory.createDeck(6);
     final players6 = InitialExchangeService.performInitialExchange(
@@ -89,10 +129,8 @@ void main() {
   });
 
   test('Dynamic card selection avoids immediate repetition for 4 and 5 players', () {
-    // 4 players: 15 combinations available
     final set1 = CardDeckFactory.selectActiveTypes(4).toSet();
     final set2 = CardDeckFactory.selectActiveTypes(4).toSet();
-    // Subsequent selection should not be identical when alternatives exist
     final isDifferent = set1.difference(set2).isNotEmpty;
     expect(isDifferent, isTrue);
   });

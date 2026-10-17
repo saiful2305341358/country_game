@@ -11,10 +11,13 @@ class GameSettings {
   const GameSettings({
     this.soundEnabled = true,
     this.animationsEnabled = true,
-    this.botDelayMs = 800,
+    this.botDelayMs = 1650,
     this.themeName = 'emerald',
     this.totalPlayers = 4,
   });
+
+  /// Global shared settings across screens.
+  static GameSettings current = const GameSettings();
 
   GameSettings copyWith({
     bool? soundEnabled,

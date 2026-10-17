@@ -29,6 +29,9 @@ class AudioServiceStub implements AudioServiceInterface {
   void playGameStart() {}
 
   @override
+  void playGameEnd() {}
+
+  @override
   void playVictory() {}
 
   @override
