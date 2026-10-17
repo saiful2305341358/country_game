@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/game_settings.dart';
 import '../services/audio_service.dart';
+import '../services/haptic_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -11,6 +12,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   late bool _soundEnabled;
+  late bool _hapticsEnabled;
   late bool _animationsEnabled;
   late int _botDelayMs;
 
@@ -18,6 +20,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _soundEnabled = AudioService.instance.isSoundEnabled;
+    _hapticsEnabled = HapticService.instance.isHapticsEnabled;
     _animationsEnabled = GameSettings.current.animationsEnabled;
     _botDelayMs = GameSettings.current.botDelayMs;
   }
@@ -25,6 +28,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _syncSettings() {
     GameSettings.current = GameSettings.current.copyWith(
       soundEnabled: _soundEnabled,
+      hapticsEnabled: _hapticsEnabled,
       animationsEnabled: _animationsEnabled,
       botDelayMs: _botDelayMs,
     );
@@ -33,12 +37,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _resetToDefaults() {
     setState(() {
       _soundEnabled = true;
+      _hapticsEnabled = true;
       AudioService.instance.isSoundEnabled = true;
+      HapticService.instance.isHapticsEnabled = true;
       _animationsEnabled = true;
       _botDelayMs = 1650;
       _syncSettings();
     });
     AudioService.instance.playButtonClick();
+    HapticService.instance.uiTap();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Settings restored to defaults'),
@@ -55,7 +62,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFFFFD54F)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            HapticService.instance.uiTap();
+            Navigator.pop(context);
+          },
         ),
         title: const Text(
           'Settings',
@@ -90,9 +100,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 constraints: const BoxConstraints(maxWidth: 460),
                 child: Column(
                   children: [
-                    // Sound Effects Card
+                    // Audio & Haptics Card
                     _buildSettingsCard(
-                      title: 'Audio',
+                      title: 'Audio & Haptics',
                       children: [
                         Material(
                           color: Colors.transparent,
@@ -123,9 +133,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 AudioService.instance.isSoundEnabled = val;
                                 _syncSettings();
                               });
+                              HapticService.instance.uiTap();
                               if (val) {
                                 // Audible confirmation feedback when testing switch
                                 AudioService.instance.playCardTap();
+                              }
+                            },
+                          ),
+                        ),
+                        const Divider(color: Colors.white12),
+                        Material(
+                          color: Colors.transparent,
+                          child: SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text(
+                              'Tactile Haptic Feedback',
+                              style: TextStyle(color: Colors.white, fontSize: 13),
+                            ),
+                            subtitle: const Text(
+                              'Physical vibration responses for card taps, turn alerts, and victory events',
+                              style: TextStyle(
+                                color: Colors.white60,
+                                fontSize: 10.5,
+                              ),
+                            ),
+                            secondary: Icon(
+                              _hapticsEnabled
+                                  ? Icons.vibration_rounded
+                                  : Icons.phonelink_erase_rounded,
+                              color: const Color(0xFFFFD54F),
+                            ),
+                            value: _hapticsEnabled,
+                            activeTrackColor: const Color(0xFFFFD54F),
+                            onChanged: (val) {
+                              setState(() {
+                                _hapticsEnabled = val;
+                                HapticService.instance.isHapticsEnabled = val;
+                                _syncSettings();
+                              });
+                              if (val) {
+                                // Tactile confirmation pulse when enabling haptics
+                                HapticService.instance.cardPass();
                               }
                             },
                           ),
@@ -165,6 +213,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 _animationsEnabled = val;
                                 _syncSettings();
                               });
+                              HapticService.instance.uiTap();
                             },
                           ),
                         ),
@@ -252,6 +301,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Expanded(
       child: GestureDetector(
         onTap: () {
+          HapticService.instance.uiTap();
           setState(() {
             _botDelayMs = ms;
             _syncSettings();

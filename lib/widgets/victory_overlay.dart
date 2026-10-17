@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/card_type.dart';
 import '../models/game_card.dart';
 import '../models/game_player.dart';
+import '../services/haptic_service.dart';
 import 'country_card_view.dart';
 
 class VictoryOverlay extends StatelessWidget {
@@ -161,7 +162,10 @@ class VictoryOverlay extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: onMainMenu,
+                    onPressed: () {
+                      HapticService.instance.uiTap();
+                      onMainMenu();
+                    },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white70,
                       side: const BorderSide(color: Colors.white24),
@@ -176,7 +180,10 @@ class VictoryOverlay extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: onPlayAgain,
+                    onPressed: () {
+                      HapticService.instance.cardPass();
+                      onPlayAgain();
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFD97706),
                       foregroundColor: Colors.white,

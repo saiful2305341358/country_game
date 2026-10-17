@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/audio_service.dart';
+import '../services/haptic_service.dart';
 
 class GameControlsDialog extends StatefulWidget {
   final VoidCallback onResume;
@@ -7,6 +8,8 @@ class GameControlsDialog extends StatefulWidget {
   final VoidCallback onMainMenu;
   final bool soundEnabled;
   final ValueChanged<bool> onSoundToggle;
+  final bool hapticsEnabled;
+  final ValueChanged<bool>? onHapticsToggle;
 
   const GameControlsDialog({
     super.key,
@@ -15,6 +18,8 @@ class GameControlsDialog extends StatefulWidget {
     required this.onMainMenu,
     required this.soundEnabled,
     required this.onSoundToggle,
+    this.hapticsEnabled = true,
+    this.onHapticsToggle,
   });
 
   @override
@@ -25,11 +30,13 @@ class _GameControlsDialogState extends State<GameControlsDialog> {
   bool _confirmRestart = false;
   bool _confirmMainMenu = false;
   late bool _soundEnabled;
+  late bool _hapticsEnabled;
 
   @override
   void initState() {
     super.initState();
     _soundEnabled = widget.soundEnabled;
+    _hapticsEnabled = widget.hapticsEnabled;
   }
 
   @override
@@ -81,35 +88,74 @@ class _GameControlsDialogState extends State<GameControlsDialog> {
 
             // Sound Toggle Row
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Icon(
-                        _soundEnabled ? Icons.volume_up : Icons.volume_off,
-                        color: const Color(0xFFFFD54F),
-                        size: 20,
+                      Row(
+                        children: [
+                          Icon(
+                            _soundEnabled ? Icons.volume_up : Icons.volume_off,
+                            color: const Color(0xFFFFD54F),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Sound Effects',
+                            style: TextStyle(color: Colors.white, fontSize: 13),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Sound Effects',
-                        style: TextStyle(color: Colors.white, fontSize: 13),
+                      Switch(
+                        value: _soundEnabled,
+                        activeTrackColor: const Color(0xFFFFD54F),
+                        onChanged: (val) {
+                          setState(() => _soundEnabled = val);
+                          HapticService.instance.uiTap();
+                          widget.onSoundToggle(val);
+                        },
                       ),
                     ],
                   ),
-                  Switch(
-                    value: _soundEnabled,
-                    activeTrackColor: const Color(0xFFFFD54F),
-                    onChanged: (val) {
-                      setState(() => _soundEnabled = val);
-                      widget.onSoundToggle(val);
-                    },
+                  const Divider(color: Colors.white12, height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            _hapticsEnabled
+                                ? Icons.vibration_rounded
+                                : Icons.phonelink_erase_rounded,
+                            color: const Color(0xFFFFD54F),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Haptic Feedback',
+                            style: TextStyle(color: Colors.white, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                      Switch(
+                        value: _hapticsEnabled,
+                        activeTrackColor: const Color(0xFFFFD54F),
+                        onChanged: (val) {
+                          setState(() => _hapticsEnabled = val);
+                          HapticService.instance.isHapticsEnabled = val;
+                          if (val) {
+                            HapticService.instance.cardTap();
+                          }
+                          widget.onHapticsToggle?.call(val);
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -132,6 +178,7 @@ class _GameControlsDialogState extends State<GameControlsDialog> {
                 ),
                 onPressed: () {
                   AudioService.instance.playButtonClick();
+                  HapticService.instance.uiTap();
                   widget.onResume();
                 },
               ),
@@ -155,6 +202,7 @@ class _GameControlsDialogState extends State<GameControlsDialog> {
                   ),
                   onPressed: () {
                     AudioService.instance.playButtonClick();
+                    HapticService.instance.uiTap();
                     setState(() {
                       _confirmRestart = true;
                       _confirmMainMenu = false;
@@ -168,7 +216,9 @@ class _GameControlsDialogState extends State<GameControlsDialog> {
                 decoration: BoxDecoration(
                   color: Colors.red.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+                  border: Border.all(
+                    color: Colors.redAccent.withValues(alpha: 0.5),
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -181,8 +231,14 @@ class _GameControlsDialogState extends State<GameControlsDialog> {
                       children: [
                         Expanded(
                           child: TextButton(
-                            child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
-                            onPressed: () => setState(() => _confirmRestart = false),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                            onPressed: () {
+                              HapticService.instance.uiTap();
+                              setState(() => _confirmRestart = false);
+                            },
                           ),
                         ),
                         Expanded(
@@ -193,6 +249,7 @@ class _GameControlsDialogState extends State<GameControlsDialog> {
                             child: const Text('Yes, Restart'),
                             onPressed: () {
                               AudioService.instance.playButtonClick();
+                              HapticService.instance.cardPass();
                               widget.onRestart();
                             },
                           ),
@@ -217,6 +274,7 @@ class _GameControlsDialogState extends State<GameControlsDialog> {
                   ),
                   onPressed: () {
                     AudioService.instance.playButtonClick();
+                    HapticService.instance.uiTap();
                     setState(() {
                       _confirmMainMenu = true;
                       _confirmRestart = false;
@@ -230,7 +288,9 @@ class _GameControlsDialogState extends State<GameControlsDialog> {
                 decoration: BoxDecoration(
                   color: Colors.amber.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                  border: Border.all(
+                    color: Colors.amber.withValues(alpha: 0.5),
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -243,8 +303,14 @@ class _GameControlsDialogState extends State<GameControlsDialog> {
                       children: [
                         Expanded(
                           child: TextButton(
-                            child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
-                            onPressed: () => setState(() => _confirmMainMenu = false),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                            onPressed: () {
+                              HapticService.instance.uiTap();
+                              setState(() => _confirmMainMenu = false);
+                            },
                           ),
                         ),
                         Expanded(
@@ -255,6 +321,7 @@ class _GameControlsDialogState extends State<GameControlsDialog> {
                             child: const Text('Exit'),
                             onPressed: () {
                               AudioService.instance.playButtonClick();
+                              HapticService.instance.uiTap();
                               widget.onMainMenu();
                             },
                           ),

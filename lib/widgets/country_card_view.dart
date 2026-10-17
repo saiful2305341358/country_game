@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import '../models/card_type.dart';
 import '../models/game_card.dart';
 
-/// Renders modern, high-contrast Country Cards and the "Total World" Starting Card.
-class CountryCardView extends StatelessWidget {
+/// Renders modern, high-contrast Country Cards and the "Global" Starting Card
+/// with tactile press compression and illegal-move recoil shake.
+class CountryCardView extends StatefulWidget {
   final GameCard card;
   final bool isSelected;
   final bool isLegal;
@@ -12,6 +13,7 @@ class CountryCardView extends StatelessWidget {
   final double width;
   final double? height;
   final VoidCallback? onTap;
+  final VoidCallback? onIllegalTap;
 
   const CountryCardView({
     super.key,
@@ -22,98 +24,162 @@ class CountryCardView extends StatelessWidget {
     this.width = 90,
     this.height,
     this.onTap,
+    this.onIllegalTap,
   });
 
   double get effectiveHeight => height ?? (width * 2.0);
 
   @override
+  State<CountryCardView> createState() => _CountryCardViewState();
+}
+
+class _CountryCardViewState extends State<CountryCardView>
+    with SingleTickerProviderStateMixin {
+  bool _isPressed = false;
+  late final AnimationController _shakeController;
+
+  @override
+  void initState() {
+    super.initState();
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
+  }
+
+  @override
+  void dispose() {
+    _shakeController.dispose();
+    super.dispose();
+  }
+
+  void _handleIllegalTap() {
+    _shakeController.forward(from: 0.0);
+    widget.onIllegalTap?.call();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final card = widget.card;
+    final width = widget.width;
+    final effectiveHeight = widget.effectiveHeight;
+    final isSelected = widget.isSelected || _isPressed;
+    final isLegal = widget.isLegal;
+
     final borderAccent = card.isStartingCard
         ? const Color(0xFF38BDF8)
         : card.type!.accentColor;
 
-    Widget cardBody = ClipRRect(
-      borderRadius: BorderRadius.circular(width * 0.10),
-      child: Container(
-        width: width,
-        height: effectiveHeight,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(width * 0.10),
-          border: Border.all(
-            color: isSelected
-                ? const Color(0xFFFFD700)
-                : borderAccent.withValues(alpha: 0.85),
-            width: isSelected ? 2.5 : 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
+    Widget cardBody = RepaintBoundary(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(width * 0.10),
+        child: Container(
+          width: width,
+          height: effectiveHeight,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(width * 0.10),
+            border: Border.all(
               color: isSelected
-                  ? const Color(0xFFFFD700).withValues(alpha: 0.45)
-                  : Colors.black.withValues(alpha: 0.45),
-              blurRadius: isSelected ? 14 : 8,
-              offset: Offset(0, isSelected ? -4 : 3),
+                  ? const Color(0xFFFFD700)
+                  : borderAccent.withValues(alpha: 0.85),
+              width: isSelected ? 2.5 : 1.5,
             ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            // Background Artwork CustomPainter
-            Positioned.fill(
-              child: CustomPaint(
-                painter: CardArtworkPainter(card: card),
+            boxShadow: [
+              BoxShadow(
+                color: isSelected
+                    ? const Color(0xFFFFD700).withValues(alpha: 0.45)
+                    : Colors.black.withValues(alpha: 0.45),
+                blurRadius: isSelected ? 14 : 8,
+                offset: Offset(0, isSelected ? -4 : 3),
               ),
-            ),
-
-            // Modern Typography & Badge Content Overlay
-            Positioned.fill(
-              child: _buildCardContent(context),
-            ),
-
-            // Illegal move overlay (dimmed + clear badge)
-            if (!isLegal)
+            ],
+          ),
+          child: Stack(
+            children: [
+              // Background Artwork CustomPainter cached in GPU layer
               Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.68),
-                    borderRadius: BorderRadius.circular(width * 0.09),
-                  ),
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDC2626).withValues(alpha: 0.92),
-                        borderRadius: BorderRadius.circular(5),
-                        border: Border.all(color: Colors.white70, width: 0.8),
-                      ),
-                      child: const Text(
-                        'SAME TYPE',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 7.5,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.7,
+                child: CustomPaint(
+                  painter: CardArtworkPainter(card: card),
+                  isComplex: true,
+                  willChange: false,
+                ),
+              ),
+
+              // Modern Typography & Badge Content Overlay
+              Positioned.fill(
+                child: _buildCardContent(context),
+              ),
+
+              // Illegal move overlay (dimmed + clear badge)
+              if (!isLegal)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.68),
+                      borderRadius: BorderRadius.circular(width * 0.09),
+                    ),
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDC2626).withValues(alpha: 0.92),
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(color: Colors.white70, width: 0.8),
+                        ),
+                        child: const Text(
+                          'SAME TYPE',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 7.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.7,
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
 
-    if (onTap != null && isLegal) {
+    if (widget.onTap != null && isLegal) {
       return GestureDetector(
-        onTap: onTap,
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapUp: (_) => setState(() => _isPressed = false),
+        onTapCancel: () => setState(() => _isPressed = false),
+        onTap: widget.onTap,
         child: MouseRegion(
           cursor: SystemMouseCursors.click,
           child: AnimatedScale(
-            duration: const Duration(milliseconds: 160),
-            scale: isSelected ? 1.05 : 1.0,
+            duration: const Duration(milliseconds: 120),
+            scale: _isPressed ? 0.95 : (widget.isSelected ? 1.05 : 1.0),
+            child: cardBody,
+          ),
+        ),
+      );
+    }
+
+    if (!isLegal && widget.onIllegalTap != null) {
+      return GestureDetector(
+        onTap: _handleIllegalTap,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.forbidden,
+          child: AnimatedBuilder(
+            animation: _shakeController,
+            builder: (context, child) {
+              final dx =
+                  math.sin(_shakeController.value * math.pi * 4) * 5.0 * (1.0 - _shakeController.value);
+              return Transform.translate(
+                offset: Offset(dx, 0),
+                child: child,
+              );
+            },
             child: cardBody,
           ),
         ),
@@ -124,6 +190,8 @@ class CountryCardView extends StatelessWidget {
   }
 
   Widget _buildCardContent(BuildContext context) {
+    final card = widget.card;
+    final width = widget.width;
     final scale = (width / 90.0).clamp(0.48, 1.45);
 
     if (card.isStartingCard) {
@@ -290,7 +358,7 @@ class CountryCardView extends StatelessWidget {
 }
 
 /// Custom painter rendering distinct, high-contrast vector motifs for each country
-/// and the "Total World" minimalist globe/topographic motif for the Starting Card.
+/// and the "Global" minimalist globe/topographic motif for the Starting Card.
 class CardArtworkPainter extends CustomPainter {
   final GameCard card;
 

@@ -4,6 +4,7 @@ import '../models/game_card.dart';
 import '../models/game_player.dart';
 import '../models/game_state.dart';
 import '../services/audio_service.dart';
+import '../services/haptic_service.dart';
 import 'card_back_view.dart';
 import 'card_dimensions.dart';
 import 'country_card_view.dart';
@@ -16,6 +17,7 @@ class PlayingTable extends StatefulWidget {
   final bool isProcessingMove;
   final bool isDealing;
   final double dealingProgress;
+  final Animation<double>? dealingAnimation;
   final bool soundEnabled;
   final VoidCallback onToggleSound;
   final bool animationsEnabled;
@@ -28,6 +30,7 @@ class PlayingTable extends StatefulWidget {
     this.isProcessingMove = false,
     this.isDealing = false,
     this.dealingProgress = 1.0,
+    this.dealingAnimation,
     required this.soundEnabled,
     required this.onToggleSound,
     this.animationsEnabled = true,
@@ -46,6 +49,11 @@ class _PlayingTableState extends State<PlayingTable>
   int? _animatingPlayerIndex;
   GameCard? _animatingDiscardedCard;
   GameCard? _animatingTakenCard;
+
+  // Cached moving card widgets for the active pass animation to avoid per-frame widget allocation
+  Size? _cachedMovingSize;
+  Widget? _cachedTakenWidget;
+  Widget? _cachedDiscardedWidget;
 
   @override
   void initState() {
@@ -68,6 +76,8 @@ class _PlayingTableState extends State<PlayingTable>
     if (widget.state.turnCount == 0) {
       _lastAnimatedTurnCount = 0;
       _animatingPlayerIndex = null;
+      _cachedTakenWidget = null;
+      _cachedDiscardedWidget = null;
       _passController.reset();
       return;
     }
@@ -80,7 +90,45 @@ class _PlayingTableState extends State<PlayingTable>
       _animatingPlayerIndex = widget.state.lastMovePlayerIndex;
       _animatingDiscardedCard = widget.state.lastDiscardedCard;
       _animatingTakenCard = widget.state.lastTakenCard;
+      _cachedMovingSize = null; // Re-cache once for new card pair
       _passController.forward(from: 0.0);
+    }
+  }
+
+  void _ensurePassingWidgetsCached(Size movingSize) {
+    if (_cachedMovingSize == movingSize &&
+        (_cachedTakenWidget != null || _cachedDiscardedWidget != null)) {
+      return;
+    }
+    _cachedMovingSize = movingSize;
+    final playerIdx = _animatingPlayerIndex ?? 0;
+
+    if (_animatingTakenCard != null) {
+      _cachedTakenWidget = RepaintBoundary(
+        child: playerIdx == 0
+            ? CountryCardView(
+                card: _animatingTakenCard!,
+                width: movingSize.width,
+                height: movingSize.height,
+              )
+            : CardBackView(
+                width: movingSize.width * 0.78,
+              ),
+      );
+    } else {
+      _cachedTakenWidget = null;
+    }
+
+    if (_animatingDiscardedCard != null) {
+      _cachedDiscardedWidget = RepaintBoundary(
+        child: CountryCardView(
+          card: _animatingDiscardedCard!,
+          width: movingSize.width,
+          height: movingSize.height,
+        ),
+      );
+    } else {
+      _cachedDiscardedWidget = null;
     }
   }
 
@@ -181,10 +229,14 @@ class _PlayingTableState extends State<PlayingTable>
           ),
           child: Stack(
             children: [
-              // Decorative table felt border and center rings
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: TableFeltPainter(),
+              // Static decorative table felt border and center rings isolated in GPU layer
+              const Positioned.fill(
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: TableFeltPainter(),
+                    isComplex: true,
+                    willChange: false,
+                  ),
                 ),
               ),
 
@@ -193,7 +245,9 @@ class _PlayingTableState extends State<PlayingTable>
                 top: 0,
                 left: 0,
                 right: 0,
-                child: _buildTopHud(context),
+                child: RepaintBoundary(
+                  child: _buildTopHud(context),
+                ),
               ),
 
               // Central Table Card Area (Classic single upright centered style)
@@ -202,39 +256,45 @@ class _PlayingTableState extends State<PlayingTable>
                 top: tableCenter.dy - (tableCardSize.height + 54) / 2,
                 width: tableCardSize.width + 32,
                 height: tableCardSize.height + 54,
-                child: _buildCentralTableArea(context, tableCardSize),
+                child: RepaintBoundary(
+                  child: _buildCentralTableArea(context, tableCardSize),
+                ),
               ),
 
-              // Opponent Seats arranged responsively around edges
+              // Opponent Seats arranged responsively around edges (each seat has its own RepaintBoundary)
               ..._buildOpponentSeats(
                 opponentPlayers: opponentPlayers,
                 screenWidth: screenWidth,
                 screenHeight: screenHeight,
               ),
 
-              // 2D Card Passing Animation Overlay
+              // 2D Card Passing Animation Overlay isolated in its own RepaintBoundary
               if (_animatingPlayerIndex != null)
-                AnimatedBuilder(
-                  animation: _passCurve,
-                  builder: (context, _) {
-                    if (!_passController.isAnimating) {
-                      return const SizedBox.shrink();
-                    }
-                    return _buildPassingCardsOverlay(
-                      screenWidth: screenWidth,
-                      screenHeight: screenHeight,
-                      tableCenter: tableCenter,
-                      tableCardSize: tableCardSize,
-                    );
-                  },
+                RepaintBoundary(
+                  child: AnimatedBuilder(
+                    animation: _passCurve,
+                    builder: (context, _) {
+                      if (!_passController.isAnimating) {
+                        return const SizedBox.shrink();
+                      }
+                      return _buildPassingCardsOverlay(
+                        screenWidth: screenWidth,
+                        screenHeight: screenHeight,
+                        tableCenter: tableCenter,
+                        tableCardSize: tableCardSize,
+                      );
+                    },
+                  ),
                 ),
 
-              // Initial Shuffling & Dealing Animation Overlay
+              // Initial Shuffling & Dealing Animation Overlay isolated in its own RepaintBoundary
               if (widget.isDealing)
-                _buildDealingOverlay(
-                  screenWidth: screenWidth,
-                  screenHeight: screenHeight,
-                  tableCenter: tableCenter,
+                RepaintBoundary(
+                  child: _buildDealingOverlay(
+                    screenWidth: screenWidth,
+                    screenHeight: screenHeight,
+                    tableCenter: tableCenter,
+                  ),
                 ),
 
               // Human Player Hand Area at Bottom
@@ -242,10 +302,12 @@ class _PlayingTableState extends State<PlayingTable>
                 bottom: 10,
                 left: 0,
                 right: 0,
-                child: _buildHumanHandArea(
-                  context: context,
-                  humanPlayer: humanPlayer,
-                  cardSize: handCardSize,
+                child: RepaintBoundary(
+                  child: _buildHumanHandArea(
+                    context: context,
+                    humanPlayer: humanPlayer,
+                    cardSize: handCardSize,
+                  ),
                 ),
               ),
             ],
@@ -452,7 +514,8 @@ class _PlayingTableState extends State<PlayingTable>
     );
   }
 
-  /// Renders smooth 2D arc trajectories for cards moving between players and the center table.
+  /// Renders smooth 2D arc trajectories for cards moving between players and the center table
+  /// using pre-built cached card widgets so zero card artwork rebuilds occur during the 60fps animation.
   Widget _buildPassingCardsOverlay({
     required double screenWidth,
     required double screenHeight,
@@ -468,6 +531,10 @@ class _PlayingTableState extends State<PlayingTable>
       screenHeight: screenHeight,
     );
 
+    final movingWidth = tableCardSize.width * 0.85;
+    final movingHeight = movingWidth * 2.0;
+    _ensurePassingWidgetsCached(Size(movingWidth, movingHeight));
+
     // 2D parabolic arc offset perpendicular to the path
     final arcLift = math.sin(math.pi * t) * 34.0;
 
@@ -479,14 +546,11 @@ class _PlayingTableState extends State<PlayingTable>
     final takePos = Offset.lerp(tableCenter, playerAnchor, t)! +
         Offset(-arcLift * 0.6, arcLift * 0.5);
 
-    final movingWidth = tableCardSize.width * 0.85;
-    final movingHeight = movingWidth * 2.0;
-
     return IgnorePointer(
       child: Stack(
         children: [
           // Taken card moving from table to player's hand
-          if (_animatingTakenCard != null)
+          if (_cachedTakenWidget != null)
             Positioned(
               left: takePos.dx - movingWidth / 2,
               top: takePos.dy - movingHeight / 2,
@@ -494,21 +558,13 @@ class _PlayingTableState extends State<PlayingTable>
                 opacity: (1.0 - t * 0.35).clamp(0.0, 1.0),
                 child: Transform.rotate(
                   angle: (1.0 - t) * 0.14,
-                  child: playerIdx == 0
-                      ? CountryCardView(
-                          card: _animatingTakenCard!,
-                          width: movingWidth,
-                          height: movingHeight,
-                        )
-                      : CardBackView(
-                          width: movingWidth * 0.78,
-                        ),
+                  child: _cachedTakenWidget!,
                 ),
               ),
             ),
 
           // Discarded card moving from player's hand to center table
-          if (_animatingDiscardedCard != null)
+          if (_cachedDiscardedWidget != null)
             Positioned(
               left: discardPos.dx - movingWidth / 2,
               top: discardPos.dy - movingHeight / 2,
@@ -516,11 +572,7 @@ class _PlayingTableState extends State<PlayingTable>
                 opacity: (0.3 + t * 0.7).clamp(0.0, 1.0),
                 child: Transform.rotate(
                   angle: math.sin(math.pi * t) * -0.16,
-                  child: CountryCardView(
-                    card: _animatingDiscardedCard!,
-                    width: movingWidth,
-                    height: movingHeight,
-                  ),
+                  child: _cachedDiscardedWidget!,
                 ),
               ),
             ),
@@ -530,6 +582,7 @@ class _PlayingTableState extends State<PlayingTable>
   }
 
   /// Renders the initial shuffling and balanced hand dealing animation from center deck to all seats.
+  /// Driven by a localized AnimatedBuilder so the rest of PlayingTable does not rebuild on ticks.
   Widget _buildDealingOverlay({
     required double screenWidth,
     required double screenHeight,
@@ -537,88 +590,112 @@ class _PlayingTableState extends State<PlayingTable>
   }) {
     final state = widget.state;
     final n = state.totalPlayers;
-    final p = widget.dealingProgress.clamp(0.0, 1.0);
+    const sharedFlyingCard = CardBackView(width: 36);
 
-    final flyingCards = <Widget>[];
-
-    for (int playerIdx = 0; playerIdx < n; playerIdx++) {
-      final seatTarget = _getPlayerAnchor(
+    // Precompute player seat anchors once per layout rather than inside the inner loop
+    final seatTargets = List<Offset>.generate(
+      n,
+      (playerIdx) => _getPlayerAnchor(
         playerIndex: playerIdx,
         totalPlayers: n,
         screenWidth: screenWidth,
         screenHeight: screenHeight,
-      );
+      ),
+      growable: false,
+    );
 
-      for (int c = 0; c < n; c++) {
-        final delay = (c * n + playerIdx) / (n * n * 1.4);
-        final localT = ((p - delay) / 0.45).clamp(0.0, 1.0);
-        if (localT <= 0.0 || localT >= 1.0) continue;
-
-        final curvedT = Curves.easeOutCubic.transform(localT);
-        final pos = Offset.lerp(tableCenter, seatTarget, curvedT)!;
-
-        flyingCards.add(
-          Positioned(
-            left: pos.dx - 18,
-            top: pos.dy - 36,
-            child: Transform.rotate(
-              angle: (1.0 - curvedT) * 0.4,
-              child: const CardBackView(width: 36),
+    final dealingBanner = Positioned(
+      top: 56,
+      left: 20,
+      right: 20,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.94),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: const Color(0xFFFFD700),
+              width: 1.2,
             ),
           ),
-        );
-      }
-    }
-
-    return IgnorePointer(
-      child: Stack(
-        children: [
-          ...flyingCards,
-          Positioned(
-            top: 56,
-            left: 20,
-            right: 20,
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A).withValues(alpha: 0.94),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: const Color(0xFFFFD700),
-                    width: 1.2,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.style,
+                color: Color(0xFFFFD54F),
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  'Dealing Balanced Hands • 1 Card of Each Country (${state.totalPlayers} Cards/Player)',
+                  style: const TextStyle(
+                    color: Color(0xFFFFE082),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.style,
-                      color: Color(0xFFFFD54F),
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        'Dealing Balanced Hands • 1 Card of Each Country (${state.totalPlayers} Cards/Player)',
-                        style: const TextStyle(
-                          color: Color(0xFFFFE082),
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
+
+    Widget buildFrame(double progress, Widget? bannerChild) {
+      final p = progress.clamp(0.0, 1.0);
+      final flyingCards = <Widget>[];
+      final denom = n * n * 1.4;
+
+      for (int playerIdx = 0; playerIdx < n; playerIdx++) {
+        final seatTarget = seatTargets[playerIdx];
+
+        for (int c = 0; c < n; c++) {
+          final delay = (c * n + playerIdx) / denom;
+          final localT = ((p - delay) / 0.45).clamp(0.0, 1.0);
+          if (localT <= 0.0 || localT >= 1.0) continue;
+
+          final curvedT = Curves.easeOutCubic.transform(localT);
+          final pos = Offset.lerp(tableCenter, seatTarget, curvedT)!;
+
+          flyingCards.add(
+            Positioned(
+              left: pos.dx - 18,
+              top: pos.dy - 36,
+              child: Transform.rotate(
+                angle: (1.0 - curvedT) * 0.4,
+                child: sharedFlyingCard,
+              ),
+            ),
+          );
+        }
+      }
+
+      return IgnorePointer(
+        child: Stack(
+          children: [
+            ...flyingCards,
+            ?bannerChild,
+          ],
+        ),
+      );
+    }
+
+    if (widget.dealingAnimation != null) {
+      return AnimatedBuilder(
+        animation: widget.dealingAnimation!,
+        child: dealingBanner,
+        builder: (context, bannerChild) =>
+            buildFrame(widget.dealingAnimation!.value, bannerChild),
+      );
+    }
+
+    return buildFrame(widget.dealingProgress, dealingBanner);
   }
 
   List<Widget> _buildOpponentSeats({
@@ -729,6 +806,7 @@ class _PlayingTableState extends State<PlayingTable>
     final isThinking = isCurrentTurn && !player.isHuman && !state.isGameOver;
 
     return PlayerSeat(
+      key: ValueKey<int>(player.id),
       player: player,
       isCurrentTurn: isCurrentTurn,
       isThinking: isThinking,
@@ -743,9 +821,55 @@ class _PlayingTableState extends State<PlayingTable>
   }) {
     final state = widget.state;
     final isHumanTurn = !widget.isDealing && state.isHumanTurn;
-    final handRevealProgress = widget.isDealing
-        ? ((widget.dealingProgress - 0.25) / 0.75).clamp(0.0, 1.0)
-        : 1.0;
+
+    // Build the row of cards ONCE per state update; passed as static child during deal animation
+    final cardsScrollRow = SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          for (final card in humanPlayer.hand)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: _buildHumanCard(
+                card: card,
+                isHumanTurn: isHumanTurn,
+                cardSize: cardSize,
+              ),
+            ),
+        ],
+      ),
+    );
+
+    Widget animatedHandRow;
+    if (widget.isDealing && widget.dealingAnimation != null) {
+      animatedHandRow = AnimatedBuilder(
+        animation: widget.dealingAnimation!,
+        child: cardsScrollRow,
+        builder: (context, child) {
+          final reveal =
+              ((widget.dealingAnimation!.value - 0.25) / 0.75).clamp(0.0, 1.0);
+          return Opacity(
+            opacity: reveal,
+            child: Transform.translate(
+              offset: Offset(0, (1.0 - reveal) * 28),
+              child: child,
+            ),
+          );
+        },
+      );
+    } else if (widget.isDealing) {
+      final reveal = ((widget.dealingProgress - 0.25) / 0.75).clamp(0.0, 1.0);
+      animatedHandRow = Opacity(
+        opacity: reveal,
+        child: Transform.translate(
+          offset: Offset(0, (1.0 - reveal) * 28),
+          child: cardsScrollRow,
+        ),
+      );
+    } else {
+      animatedHandRow = cardsScrollRow;
+    }
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -772,30 +896,7 @@ class _PlayingTableState extends State<PlayingTable>
             ),
           ),
 
-        // Hand cards row with animated reveal during initial deal
-        Opacity(
-          opacity: handRevealProgress,
-          child: Transform.translate(
-            offset: Offset(0, (1.0 - handRevealProgress) * 28),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  for (final card in humanPlayer.hand)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: _buildHumanCard(
-                        card: card,
-                        isHumanTurn: isHumanTurn,
-                        cardSize: cardSize,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
+        animatedHandRow,
       ],
     );
   }
@@ -808,6 +909,7 @@ class _PlayingTableState extends State<PlayingTable>
     final isLegal = isHumanTurn && widget.state.isLegalDiscard(card);
 
     return CountryCardView(
+      key: ValueKey<String>(card.id),
       card: card,
       width: cardSize.width,
       height: cardSize.height,
@@ -815,8 +917,14 @@ class _PlayingTableState extends State<PlayingTable>
       isSelected: false,
       onTap: isLegal && !widget.isProcessingMove
           ? () {
+              HapticService.instance.cardTap();
               AudioService.instance.playCardTap();
               widget.onCardSelected(card);
+            }
+          : null,
+      onIllegalTap: isHumanTurn && !isLegal && !widget.isProcessingMove
+          ? () {
+              HapticService.instance.invalidMove();
             }
           : null,
     );
@@ -824,6 +932,8 @@ class _PlayingTableState extends State<PlayingTable>
 }
 
 class TableFeltPainter extends CustomPainter {
+  const TableFeltPainter();
+
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Rect.fromLTWH(0, 0, size.width, size.height);

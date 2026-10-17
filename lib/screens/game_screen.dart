@@ -4,6 +4,7 @@ import '../models/card_type.dart';
 import '../models/game_card.dart';
 import '../models/game_settings.dart';
 import '../services/audio_service.dart';
+import '../services/haptic_service.dart';
 import '../widgets/game_controls_dialog.dart';
 import '../widgets/playing_table.dart';
 import '../widgets/victory_overlay.dart';
@@ -42,6 +43,9 @@ class _GameScreenState extends State<GameScreen>
     )..addStatusListener((status) {
         if (status == AnimationStatus.completed && mounted) {
           setState(() => _isDealing = false);
+          if (_engine.state?.isHumanTurn == true) {
+            HapticService.instance.yourTurnNotice();
+          }
           _engine.resumeActivePlay();
         }
       });
@@ -60,14 +64,18 @@ class _GameScreenState extends State<GameScreen>
       deferBotStart: animateDeal,
     );
 
-    // Subtle, crisp startup chime on Game Start
+    // Subtle, crisp startup chime + shuffle haptic pulse on Game Start
     AudioService.instance.playGameStart();
+    HapticService.instance.dealShuffle();
 
     if (animateDeal) {
       setState(() => _isDealing = true);
       _dealingController.forward(from: 0.0);
     } else {
       setState(() => _isDealing = false);
+      if (_engine.state?.isHumanTurn == true) {
+        HapticService.instance.yourTurnNotice();
+      }
     }
   }
 
@@ -82,15 +90,24 @@ class _GameScreenState extends State<GameScreen>
 
       if (state.isGameOver) {
         if (state.winner?.isHuman == true) {
-          // Charming, rewarding, uplifting sound when user wins
+          // Charming, rewarding, uplifting sound + celebratory haptic fanfare when user wins
           AudioService.instance.playVictory();
+          HapticService.instance.victory();
         } else {
-          // Distinct audio cue signaling the round has concluded
+          // Distinct audio cue + round-end haptic pulse signaling the round has concluded
           AudioService.instance.playGameEnd();
+          HapticService.instance.roundEnd();
         }
       } else if (wasBotMove) {
         // Subtle wooden tap + slide feedback for bot card passing
         AudioService.instance.playCardPlace();
+        if (state.isHumanTurn) {
+          // Distinct tactile alert when turn arrives at the human player ("Your Turn")
+          HapticService.instance.yourTurnNotice();
+        } else {
+          // Soft micro-tick for bot-to-bot turn progression
+          HapticService.instance.botTurnTick();
+        }
       }
     }
 
@@ -103,11 +120,15 @@ class _GameScreenState extends State<GameScreen>
     final success = _engine.makeMove(card);
     if (success) {
       AudioService.instance.playCardPlace();
+      HapticService.instance.cardPass();
+    } else {
+      HapticService.instance.invalidMove();
     }
   }
 
   void _toggleSoundFromHud() {
     final nextVal = !AudioService.instance.isSoundEnabled;
+    HapticService.instance.uiTap();
     setState(() {
       AudioService.instance.isSoundEnabled = nextVal;
       GameSettings.current = GameSettings.current.copyWith(
@@ -120,12 +141,14 @@ class _GameScreenState extends State<GameScreen>
   }
 
   void _showPauseDialog() {
+    HapticService.instance.uiTap();
     _engine.pauseActivePlay();
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => GameControlsDialog(
         soundEnabled: AudioService.instance.isSoundEnabled,
+        hapticsEnabled: HapticService.instance.isHapticsEnabled,
         onSoundToggle: (val) {
           setState(() {
             AudioService.instance.isSoundEnabled = val;
@@ -136,6 +159,14 @@ class _GameScreenState extends State<GameScreen>
           if (val) {
             AudioService.instance.playButtonClick();
           }
+        },
+        onHapticsToggle: (val) {
+          setState(() {
+            HapticService.instance.isHapticsEnabled = val;
+            GameSettings.current = GameSettings.current.copyWith(
+              hapticsEnabled: val,
+            );
+          });
         },
         onResume: () {
           Navigator.pop(context);
@@ -178,22 +209,18 @@ class _GameScreenState extends State<GameScreen>
     return Scaffold(
       body: Stack(
         children: [
-          // Main Playing Table with Dealing & Passing Animations
-          AnimatedBuilder(
-            animation: _dealingController,
-            builder: (context, _) {
-              return PlayingTable(
-                state: state,
-                isProcessingMove: _engine.isProcessingMove,
-                isDealing: _isDealing,
-                dealingProgress: _dealingController.value,
-                soundEnabled: AudioService.instance.isSoundEnabled,
-                onToggleSound: _toggleSoundFromHud,
-                animationsEnabled: GameSettings.current.animationsEnabled,
-                onCardSelected: _onCardSelected,
-                onPause: _showPauseDialog,
-              );
-            },
+          // Main Playing Table with localized Dealing & Passing Animation layers
+          PlayingTable(
+            state: state,
+            isProcessingMove: _engine.isProcessingMove,
+            isDealing: _isDealing,
+            dealingProgress: _dealingController.value,
+            dealingAnimation: _dealingController,
+            soundEnabled: AudioService.instance.isSoundEnabled,
+            onToggleSound: _toggleSoundFromHud,
+            animationsEnabled: GameSettings.current.animationsEnabled,
+            onCardSelected: _onCardSelected,
+            onPause: _showPauseDialog,
           ),
 
           // Victory Overlay

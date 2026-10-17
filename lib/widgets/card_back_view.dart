@@ -17,57 +17,62 @@ class CardBackView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(width * 0.1),
-      child: Container(
-        width: width,
-        height: effectiveHeight,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: const Color(0xFFD4AF37).withValues(alpha: 0.8),
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.35),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
+    return RepaintBoundary(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(width * 0.1),
+        child: Container(
+          width: width,
+          height: effectiveHeight,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: const Color(0xFFD4AF37).withValues(alpha: 0.8),
+              width: 1.2,
             ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: CustomPaint(
-                painter: CardBackPainter(),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.35),
+                blurRadius: 5,
+                offset: const Offset(0, 2),
               ),
-            ),
-            if (cardCountBadge != null)
-              Positioned(
-                bottom: 4,
-                right: 4,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.75),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: const Color(0xFFFFD54F),
-                      width: 0.8,
+            ],
+          ),
+          child: Stack(
+            children: [
+              const Positioned.fill(
+                child: CustomPaint(
+                  painter: CardBackPainter(),
+                  isComplex: true,
+                  willChange: false,
+                ),
+              ),
+              if (cardCountBadge != null)
+                Positioned(
+                  bottom: 4,
+                  right: 4,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.75),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: const Color(0xFFFFD54F),
+                        width: 0.8,
+                      ),
                     ),
-                  ),
-                  child: Text(
-                    '$cardCountBadge',
-                    style: const TextStyle(
-                      color: Color(0xFFFFE082),
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
+                    child: Text(
+                      '$cardCountBadge',
+                      style: const TextStyle(
+                        color: Color(0xFFFFE082),
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -75,6 +80,8 @@ class CardBackView extends StatelessWidget {
 }
 
 class CardBackPainter extends CustomPainter {
+  const CardBackPainter();
+
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Rect.fromLTWH(0, 0, size.width, size.height);
@@ -110,8 +117,16 @@ class CardBackPainter extends CustomPainter {
 
     const step = 14.0;
     for (double i = -size.height; i < size.width + size.height; i += step) {
-      canvas.drawLine(Offset(i, 0), Offset(i + size.height, size.height), linePaint);
-      canvas.drawLine(Offset(i, size.height), Offset(i + size.height, 0), linePaint);
+      canvas.drawLine(
+        Offset(i, 0),
+        Offset(i + size.height, size.height),
+        linePaint,
+      );
+      canvas.drawLine(
+        Offset(i, size.height),
+        Offset(i + size.height, 0),
+        linePaint,
+      );
     }
 
     // Central emblem rosette

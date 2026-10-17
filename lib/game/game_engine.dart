@@ -98,7 +98,7 @@ class GameEngine extends ChangeNotifier {
       ],
     );
 
-    verifyIntegrity();
+    assert(verifyIntegrity());
     notifyListeners();
 
     if (!deferBotStart) {
@@ -176,7 +176,11 @@ class GameEngine extends ChangeNotifier {
         ? '${activePlayer.name} took Global and placed ${discardCard.displayName} on the table.'
         : '${activePlayer.name} traded ${discardCard.displayName} for ${oldTableCard.displayName}.';
 
-    final newMoveLog = List<String>.from(state.moveLog)..add(logEntry);
+    // Cap moveLog at 24 recent entries to avoid unbounded list copying & GC pressure on low-end devices
+    final prevLogs = state.moveLog;
+    final newMoveLog = prevLogs.length >= 24
+        ? <String>[...prevLogs.sublist(prevLogs.length - 23), logEntry]
+        : <String>[...prevLogs, logEntry];
 
     if (hasWon) {
       _state = state.copyWith(
@@ -195,7 +199,7 @@ class GameEngine extends ChangeNotifier {
         lastDiscardedCard: discardCard,
       );
       _isProcessingMove = false;
-      verifyIntegrity();
+      assert(verifyIntegrity());
       notifyListeners();
       return true;
     }
@@ -223,7 +227,7 @@ class GameEngine extends ChangeNotifier {
     );
 
     _isProcessingMove = false;
-    verifyIntegrity();
+    assert(verifyIntegrity());
     notifyListeners();
 
     // Trigger next bot move if next player is bot and game is not paused

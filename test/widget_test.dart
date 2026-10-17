@@ -4,6 +4,7 @@ import 'package:country_game/screens/player_selection_screen.dart';
 import 'package:country_game/widgets/card_dimensions.dart';
 import 'package:country_game/game/card_deck_factory.dart';
 import 'package:country_game/game/initial_exchange.dart';
+import 'package:country_game/services/haptic_service.dart';
 
 void main() {
   testWidgets('Main menu renders game title, dynamic tagline, and play button', (WidgetTester tester) async {
@@ -66,7 +67,7 @@ void main() {
     expect(find.text('START GAME'), findsOneWidget);
   });
 
-  testWidgets('Navigation from MainMenu to Settings screen works with no assertions', (WidgetTester tester) async {
+  testWidgets('Navigation from MainMenu to Settings screen works and displays Haptic Feedback toggle', (WidgetTester tester) async {
     await tester.pumpWidget(const CountryGameApp());
     await tester.pumpAndSettle();
 
@@ -75,8 +76,21 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Gameplay Sound Effects'), findsOneWidget);
+    expect(find.text('Tactile Haptic Feedback'), findsOneWidget);
     expect(find.text('Smooth Animations'), findsOneWidget);
     expect(find.text('Bot Thinking Pace'), findsOneWidget);
+
+    // Verify HapticService methods run cleanly
+    HapticService.instance.isHapticsEnabled = true;
+    HapticService.instance.cardTap();
+    HapticService.instance.cardPass();
+    HapticService.instance.invalidMove();
+    HapticService.instance.botTurnTick();
+    HapticService.instance.yourTurnNotice();
+    HapticService.instance.dealShuffle();
+    HapticService.instance.victory();
+    HapticService.instance.roundEnd();
+    expect(HapticService.instance.isHapticsEnabled, isTrue);
   });
 
   test('CardDimensions strictly verifies 2:1 height-to-width ratio', () {
