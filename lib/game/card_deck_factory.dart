@@ -22,9 +22,9 @@ class CardDeckFactory {
     Random? random,
     bool allowRepeat = false,
   }) {
-    if (totalPlayers < 4 || totalPlayers > 6) {
+    if (totalPlayers < 3 || totalPlayers > 6) {
       throw ArgumentError(
-        'Supported player counts are 4, 5, or 6. Received: $totalPlayers',
+        'Supported player counts are 3, 4, 5, or 6. Received: $totalPlayers',
       );
     }
 

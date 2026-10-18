@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/game_card.dart';
 import '../models/game_player.dart';
@@ -6,20 +5,42 @@ import '../models/game_state.dart';
 import '../services/audio_service.dart';
 import '../services/haptic_service.dart';
 import 'card_back_view.dart';
-import 'card_dimensions.dart';
 import 'country_card_view.dart';
 import 'player_seat.dart';
+
+/// Opponent seat position on the 1920x1080 horizontal stage from the HTML design (`PP`).
+class _StageSeatConfig {
+  final Offset avatarPos;
+
+  const _StageSeatConfig({
+    required this.avatarPos,
+  });
+}
+
+/// Fan slot configuration for the human player's hand.
+class _FanSlot {
+  final double a;
+  final double d;
+  final double tDeg;
+
+  const _FanSlot({
+    required this.a,
+    required this.d,
+    required this.tDeg,
+  });
+}
 
 class PlayingTable extends StatefulWidget {
   final GameState state;
   final ValueChanged<GameCard> onCardSelected;
   final VoidCallback onPause;
+  final VoidCallback? onShowStats;
+  final VoidCallback? onShowTutorial;
+  final VoidCallback? onExchangeAnimationComplete;
   final bool isProcessingMove;
   final bool isDealing;
   final double dealingProgress;
   final Animation<double>? dealingAnimation;
-  final bool soundEnabled;
-  final VoidCallback onToggleSound;
   final bool animationsEnabled;
 
   const PlayingTable({
@@ -27,12 +48,13 @@ class PlayingTable extends StatefulWidget {
     required this.state,
     required this.onCardSelected,
     required this.onPause,
+    this.onShowStats,
+    this.onShowTutorial,
+    this.onExchangeAnimationComplete,
     this.isProcessingMove = false,
     this.isDealing = false,
     this.dealingProgress = 1.0,
     this.dealingAnimation,
-    required this.soundEnabled,
-    required this.onToggleSound,
     this.animationsEnabled = true,
   });
 
@@ -42,16 +64,93 @@ class PlayingTable extends StatefulWidget {
 
 class _PlayingTableState extends State<PlayingTable>
     with SingleTickerProviderStateMixin {
+  static const double _stageWidth = 1920.0;
+  static const double _stageHeight = 1080.0;
+
+  // Card dimensions from HTML (.card { width: 128px; height: 188px })
+  static const double _cardWidth = 128.0;
+  static const double _cardHeight = 188.0;
+
+  // Two existing center table card positions aligned side-by-side in the center of the table:
+  // Slot 0 (Left table position): left: 819px, top: 453px, upright (0 deg)
+  static const Offset _leftTableSlotTopLeft = Offset(819.0, 453.0);
+
+  // Slot 1 (Right table position): left: 981px, top: 453px, upright (0 deg)
+  static const Offset _rightTableSlotTopLeft = Offset(981.0, 453.0);
+
+  static const Offset _deckPileCenter = Offset(981.0 + 64.0, 453.0 + 94.0);
+
+  // Human hand container layout at bottom center
+  static const double _handContainerWidth = 1100.0;
+  static const double _handContainerHeight = 250.0;
+  static const double _handContainerLeft =
+      (_stageWidth - _handContainerWidth) / 2.0;
+  static const double _handContainerTop = _stageHeight - _handContainerHeight;
+  static const Offset _humanHandCenter = Offset(960.0, 960.0);
+
+  // Natural medium-speed easing curve: cubic-bezier(0.22, 1, 0.36, 1)
+  static const Curve _exchangeCurve = Cubic(0.22, 1.0, 0.36, 1.0);
+
+  // Strict sequential exchange phase boundaries along _passController (0.0 -> 1.0):
+  // Phase 2 (0.00 -> 0.44): Incoming card moves directly from player to open table slot.
+  //                         Existing table card stays 100% stationary in its slot.
+  // Phase 3 (0.44 -> 0.56): Incoming card has arrived completely; both cards rest stably
+  //                         for a natural, deliberate beat before the pickup begins.
+  // Phase 4 (0.56 -> 1.00): Previous table card moves directly from its table slot to the
+  //                         exchanging player, while the new table card stays 100% stationary.
+  static const double _phase2End = 0.44;
+  static const double _phase4Start = 0.56;
+
+  // Dedicated balanced seat layouts by player count on the 1920x1080 stage:
+  // 3 Players (1 Human at bottom + 2 Bots in a balanced triangle around the center cards)
+  static const List<_StageSeatConfig> _twoOpponentSlots = [
+    // 0: Upper-Left flank
+    _StageSeatConfig(avatarPos: Offset(450, 380)),
+    // 1: Upper-Right flank
+    _StageSeatConfig(avatarPos: Offset(1470, 380)),
+  ];
+
+  // 4 Players (1 Human at bottom + 3 Bots at Left-Center, Top-Center, Right-Center)
+  static const List<_StageSeatConfig> _threeOpponentSlots = [
+    // 0: Left-Center (vertically aligned with center table cards)
+    _StageSeatConfig(avatarPos: Offset(380, 540)),
+    // 1: Top-Center (directly across from human player)
+    _StageSeatConfig(avatarPos: Offset(960, 110)),
+    // 2: Right-Center (vertically aligned with center table cards)
+    _StageSeatConfig(avatarPos: Offset(1540, 540)),
+  ];
+
+  // 5 & 6 Players opponent avatar seats from HTML `PP`
+  static const List<_StageSeatConfig> _fiveOpponentSlots = [
+    // 0: Bottom-Left
+    _StageSeatConfig(avatarPos: Offset(401, 762)),
+    // 1: Top-Left
+    _StageSeatConfig(avatarPos: Offset(548, 313)),
+    // 2: Top-Center
+    _StageSeatConfig(avatarPos: Offset(960, 88)),
+    // 3: Top-Right
+    _StageSeatConfig(avatarPos: Offset(1372, 313)),
+    // 4: Bottom-Right
+    _StageSeatConfig(avatarPos: Offset(1519, 762)),
+  ];
+
   late final AnimationController _passController;
-  late final Animation<double> _passCurve;
 
   int _lastAnimatedTurnCount = 0;
+  bool _isAnimatingExchange = false;
+  bool _hasPlayedLandingCue = false;
+  bool _hasPlayedOutgoingCue = false;
   int? _animatingPlayerIndex;
+  int? _animatingHandIndex;
+  int _oldTableSlotIndex = 0;
+  int _incomingTableSlotIndex = 1;
+  Offset _lockedPlayerCardPos = Offset.zero;
+  Offset _lockedOldTableSlotPos = _leftTableSlotTopLeft;
+  Offset _lockedIncomingTableSlotPos = _rightTableSlotTopLeft;
   GameCard? _animatingDiscardedCard;
   GameCard? _animatingTakenCard;
+  String? _selectedCardId;
 
-  // Cached moving card widgets for the active pass animation to avoid per-frame widget allocation
-  Size? _cachedMovingSize;
   Widget? _cachedTakenWidget;
   Widget? _cachedDiscardedWidget;
 
@@ -60,13 +159,41 @@ class _PlayingTableState extends State<PlayingTable>
     super.initState();
     _passController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 850),
-    );
-    _passCurve = CurvedAnimation(
-      parent: _passController,
-      curve: Curves.easeInOutCubic,
-    );
+      duration: const Duration(milliseconds: 1020),
+    )
+      ..addListener(_onPassAnimationTick)
+      ..addStatusListener(_onPassAnimationStatus);
     _lastAnimatedTurnCount = widget.state.turnCount;
+  }
+
+  void _onPassAnimationTick() {
+    final p = _passController.value;
+    if (!_hasPlayedLandingCue && p >= _phase2End) {
+      _hasPlayedLandingCue = true;
+      AudioService.instance.playCardPlace();
+      HapticService.instance.botTurnTick();
+    }
+    if (!_hasPlayedOutgoingCue && p >= _phase4Start) {
+      _hasPlayedOutgoingCue = true;
+      AudioService.instance.playCardTake();
+    }
+  }
+
+  void _onPassAnimationStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed && mounted) {
+      setState(() {
+        _isAnimatingExchange = false;
+        _hasPlayedLandingCue = false;
+        _hasPlayedOutgoingCue = false;
+        _animatingPlayerIndex = null;
+        _animatingHandIndex = null;
+        _animatingDiscardedCard = null;
+        _animatingTakenCard = null;
+        _cachedTakenWidget = null;
+        _cachedDiscardedWidget = null;
+      });
+      widget.onExchangeAnimationComplete?.call();
+    }
   }
 
   @override
@@ -75,45 +202,85 @@ class _PlayingTableState extends State<PlayingTable>
 
     if (widget.state.turnCount == 0) {
       _lastAnimatedTurnCount = 0;
+      _isAnimatingExchange = false;
+      _hasPlayedLandingCue = false;
+      _hasPlayedOutgoingCue = false;
       _animatingPlayerIndex = null;
+      _animatingHandIndex = null;
+      _oldTableSlotIndex = 0;
+      _incomingTableSlotIndex = 1;
+      _lockedOldTableSlotPos = _leftTableSlotTopLeft;
+      _lockedIncomingTableSlotPos = _rightTableSlotTopLeft;
+      _animatingDiscardedCard = null;
+      _animatingTakenCard = null;
+      _selectedCardId = null;
       _cachedTakenWidget = null;
       _cachedDiscardedWidget = null;
       _passController.reset();
       return;
     }
 
-    // Trigger 2D card passing animation when a new move occurs
-    if (widget.animationsEnabled &&
-        widget.state.turnCount > _lastAnimatedTurnCount &&
+    // Prevent overlapping animations or restarting an active exchange mid-flight
+    if (_isAnimatingExchange || _passController.isAnimating) {
+      return;
+    }
+
+    if (widget.state.turnCount > _lastAnimatedTurnCount &&
         widget.state.lastMovePlayerIndex != null) {
       _lastAnimatedTurnCount = widget.state.turnCount;
-      _animatingPlayerIndex = widget.state.lastMovePlayerIndex;
-      _animatingDiscardedCard = widget.state.lastDiscardedCard;
-      _animatingTakenCard = widget.state.lastTakenCard;
-      _cachedMovingSize = null; // Re-cache once for new card pair
-      _passController.forward(from: 0.0);
+      _selectedCardId = null;
+
+      // The previous table card was resting in (turnCount - 1) % 2,
+      // and the newly placed card lands in the opposite slot (turnCount % 2) and stays there.
+      _oldTableSlotIndex = (widget.state.turnCount - 1) % 2;
+      _incomingTableSlotIndex = widget.state.turnCount % 2;
+
+      if (widget.animationsEnabled &&
+          widget.state.lastDiscardedCard != null &&
+          widget.state.lastTakenCard != null) {
+        final playerIdx = widget.state.lastMovePlayerIndex!;
+        final handIdx = widget.state.lastMoveHandIndex ?? 0;
+
+        _animatingPlayerIndex = playerIdx;
+        _animatingHandIndex = handIdx;
+        _animatingDiscardedCard = widget.state.lastDiscardedCard;
+        _animatingTakenCard = widget.state.lastTakenCard;
+
+        // Lock start and destination coordinates once for the entire exchange duration
+        _lockedPlayerCardPos = _getExchangePlayerCardTopLeft(
+          playerIdx,
+          handIdx,
+          widget.state.totalPlayers,
+        );
+        _lockedOldTableSlotPos = _getTableSlotTopLeft(_oldTableSlotIndex);
+        _lockedIncomingTableSlotPos =
+            _getTableSlotTopLeft(_incomingTableSlotIndex);
+
+        _isAnimatingExchange = true;
+        _hasPlayedLandingCue = false;
+        _hasPlayedOutgoingCue = false;
+        _buildPassingCache();
+        _passController.forward(from: 0.0);
+      } else {
+        _isAnimatingExchange = false;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            widget.onExchangeAnimationComplete?.call();
+          }
+        });
+      }
     }
   }
 
-  void _ensurePassingWidgetsCached(Size movingSize) {
-    if (_cachedMovingSize == movingSize &&
-        (_cachedTakenWidget != null || _cachedDiscardedWidget != null)) {
-      return;
-    }
-    _cachedMovingSize = movingSize;
-    final playerIdx = _animatingPlayerIndex ?? 0;
-
+  void _buildPassingCache() {
     if (_animatingTakenCard != null) {
       _cachedTakenWidget = RepaintBoundary(
-        child: playerIdx == 0
-            ? CountryCardView(
-                card: _animatingTakenCard!,
-                width: movingSize.width,
-                height: movingSize.height,
-              )
-            : CardBackView(
-                width: movingSize.width * 0.78,
-              ),
+        child: CountryCardView(
+          card: _animatingTakenCard!,
+          width: _cardWidth,
+          height: _cardHeight,
+          isLegal: true,
+        ),
       );
     } else {
       _cachedTakenWidget = null;
@@ -123,8 +290,9 @@ class _PlayingTableState extends State<PlayingTable>
       _cachedDiscardedWidget = RepaintBoundary(
         child: CountryCardView(
           card: _animatingDiscardedCard!,
-          width: movingSize.width,
-          height: movingSize.height,
+          width: _cardWidth,
+          height: _cardHeight,
+          isLegal: true,
         ),
       );
     } else {
@@ -134,520 +302,615 @@ class _PlayingTableState extends State<PlayingTable>
 
   @override
   void dispose() {
+    _passController.removeListener(_onPassAnimationTick);
+    _passController.removeStatusListener(_onPassAnimationStatus);
     _passController.dispose();
     super.dispose();
   }
 
-  /// Computes the 2D center anchor position for any player index (0 = bottom human, 1..N-1 = bots).
-  Offset _getPlayerAnchor({
-    required int playerIndex,
-    required int totalPlayers,
-    required double screenWidth,
-    required double screenHeight,
-  }) {
-    final topOffset = screenHeight < 600 ? 80.0 : 96.0;
+  Offset _getTableSlotTopLeft(int slotIndex) =>
+      slotIndex == 0 ? _leftTableSlotTopLeft : _rightTableSlotTopLeft;
 
-    if (playerIndex == 0) {
-      return Offset(screenWidth * 0.5, screenHeight - 90);
-    }
-
-    if (totalPlayers == 4) {
-      switch (playerIndex) {
-        case 1:
-          return Offset(85, screenHeight * 0.43);
-        case 2:
-          return Offset(screenWidth * 0.5, topOffset);
-        case 3:
-          return Offset(screenWidth - 85, screenHeight * 0.43);
-      }
+  /// Maps opponent index (0..totalPlayers-2) to its balanced stage seat for 3, 4, 5, or 6 players.
+  _StageSeatConfig _getOpponentStageSeat(int opponentIdx, int totalPlayers) {
+    if (totalPlayers == 3) {
+      // 2 bots: balanced Upper-Left and Upper-Right triangle seats
+      return _twoOpponentSlots[opponentIdx % _twoOpponentSlots.length];
+    } else if (totalPlayers == 4) {
+      // 3 bots: classic 4-player compass seats (Left-Center, Top-Center, Right-Center)
+      return _threeOpponentSlots[opponentIdx % _threeOpponentSlots.length];
     } else if (totalPlayers == 5) {
-      switch (playerIndex) {
-        case 1:
-          return Offset(80, screenHeight * 0.45);
-        case 2:
-          return Offset(screenWidth * 0.28, topOffset);
-        case 3:
-          return Offset(screenWidth * 0.72, topOffset);
-        case 4:
-          return Offset(screenWidth - 80, screenHeight * 0.45);
-      }
+      // 4 bots: Bottom-Left, Top-Left, Top-Right, Bottom-Right
+      const indices = [0, 1, 3, 4];
+      return _fiveOpponentSlots[indices[opponentIdx % indices.length]];
     } else {
-      switch (playerIndex) {
-        case 1:
-          return Offset(80, screenHeight * 0.66);
-        case 2:
-          return Offset(85, topOffset);
-        case 3:
-          return Offset(screenWidth * 0.5, topOffset);
-        case 4:
-          return Offset(screenWidth - 85, topOffset);
-        case 5:
-          return Offset(screenWidth - 80, screenHeight * 0.66);
-      }
+      // 5 bots: all 5 slots
+      return _fiveOpponentSlots[opponentIdx % _fiveOpponentSlots.length];
     }
-    return Offset(screenWidth * 0.5, screenHeight * 0.5);
+  }
+
+  /// Returns the target center position on the 1920x1080 stage for dealing animations.
+  Offset _getPlayerTargetAnchor(int playerIndex, int totalPlayers) {
+    if (playerIndex == 0) {
+      return _humanHandCenter;
+    }
+    return _getOpponentStageSeat(playerIndex - 1, totalPlayers).avatarPos;
+  }
+
+  /// Computes the exact top-left coordinate on the 1920x1080 stage for a card in the human player's hand.
+  Offset _getHumanCardStageTopLeft(int cardIndex, int handCount) {
+    final safeCount = handCount > 0 ? handCount : widget.state.totalPlayers;
+    final clampedIndex = cardIndex.clamp(0, safeCount - 1);
+    final slot = _fanSlot(clampedIndex, safeCount);
+    final cardLeft = (_handContainerWidth - _cardWidth) / 2.0 + slot.a;
+    final cardTop = 36.0 + slot.d;
+    return Offset(_handContainerLeft + cardLeft, _handContainerTop + cardTop);
+  }
+
+  /// Computes the exact top-left coordinate on the 1920x1080 stage for any player's card during an exchange.
+  Offset _getExchangePlayerCardTopLeft(
+    int playerIndex,
+    int handIndex,
+    int totalPlayers,
+  ) {
+    if (playerIndex == 0) {
+      final handCount = widget.state.players[0].hand.length;
+      return _getHumanCardStageTopLeft(handIndex, handCount);
+    }
+    final seatCenter =
+        _getOpponentStageSeat(playerIndex - 1, totalPlayers).avatarPos;
+    return Offset(
+      seatCenter.dx - _cardWidth / 2.0,
+      seatCenter.dy - _cardHeight / 2.0,
+    );
+  }
+
+  /// Computes a gapless slot for card `i` of `n` in the human player's hand.
+  _FanSlot _fanSlot(int i, int n) {
+    final mid = (n - 1) / 2.0;
+    final offsetFromCenter = i - mid;
+    // Zero-gap side-by-side layout (edges touch with a 2px overlap so there is no gap)
+    const step = _cardWidth - 2.0;
+    return _FanSlot(
+      a: offsetFromCenter * step,
+      d: 0.0,
+      tDeg: 0.0,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final state = widget.state;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final screenWidth = constraints.maxWidth;
-        final screenHeight = constraints.maxHeight;
-        final tableCenter = Offset(screenWidth * 0.5, screenHeight * 0.46);
-
-        // Card sizing strictly following 2:1 ratio
-        final handCardSize = CardDimensions.getHumanHandCardSize(
-          screenWidth: screenWidth,
-          screenHeight: screenHeight,
-          totalPlayers: state.totalPlayers,
-        );
-
-        final tableCardSize = CardDimensions.getTableCardSize(
-          screenWidth: screenWidth,
-          screenHeight: screenHeight,
-        );
-
-        final humanPlayer = state.players[0];
-        final opponentPlayers = state.players.sublist(1);
-
-        return Container(
-          width: screenWidth,
-          height: screenHeight,
-          decoration: const BoxDecoration(
-            gradient: RadialGradient(
-              center: Alignment.center,
-              radius: 1.1,
-              colors: [
-                Color(0xFF0F3B2C),
-                Color(0xFF09251B),
-                Color(0xFF04140E),
-              ],
-            ),
-          ),
-          child: Stack(
-            children: [
-              // Static decorative table felt border and center rings isolated in GPU layer
-              const Positioned.fill(
-                child: RepaintBoundary(
-                  child: CustomPaint(
-                    painter: TableFeltPainter(),
-                    isComplex: true,
-                    willChange: false,
-                  ),
-                ),
-              ),
-
-              // Top HUD Bar: Turn badge ("Your Turn" for human), goal badge, status, Sound toggle, and Pause
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: RepaintBoundary(
-                  child: _buildTopHud(context),
-                ),
-              ),
-
-              // Central Table Card Area (Classic single upright centered style)
-              Positioned(
-                left: tableCenter.dx - (tableCardSize.width + 32) / 2,
-                top: tableCenter.dy - (tableCardSize.height + 54) / 2,
-                width: tableCardSize.width + 32,
-                height: tableCardSize.height + 54,
-                child: RepaintBoundary(
-                  child: _buildCentralTableArea(context, tableCardSize),
-                ),
-              ),
-
-              // Opponent Seats arranged responsively around edges (each seat has its own RepaintBoundary)
-              ..._buildOpponentSeats(
-                opponentPlayers: opponentPlayers,
-                screenWidth: screenWidth,
-                screenHeight: screenHeight,
-              ),
-
-              // 2D Card Passing Animation Overlay isolated in its own RepaintBoundary
-              if (_animatingPlayerIndex != null)
-                RepaintBoundary(
-                  child: AnimatedBuilder(
-                    animation: _passCurve,
-                    builder: (context, _) {
-                      if (!_passController.isAnimating) {
-                        return const SizedBox.shrink();
-                      }
-                      return _buildPassingCardsOverlay(
-                        screenWidth: screenWidth,
-                        screenHeight: screenHeight,
-                        tableCenter: tableCenter,
-                        tableCardSize: tableCardSize,
-                      );
-                    },
-                  ),
-                ),
-
-              // Initial Shuffling & Dealing Animation Overlay isolated in its own RepaintBoundary
-              if (widget.isDealing)
-                RepaintBoundary(
-                  child: _buildDealingOverlay(
-                    screenWidth: screenWidth,
-                    screenHeight: screenHeight,
-                    tableCenter: tableCenter,
-                  ),
-                ),
-
-              // Human Player Hand Area at Bottom
-              Positioned(
-                bottom: 10,
-                left: 0,
-                right: 0,
-                child: RepaintBoundary(
-                  child: _buildHumanHandArea(
-                    context: context,
-                    humanPlayer: humanPlayer,
-                    cardSize: handCardSize,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildTopHud(BuildContext context) {
-    final state = widget.state;
-    final activePlayer = state.currentPlayer;
-    final isHuman = activePlayer.isHuman;
+    final humanPlayer = state.players[0];
+    final opponentPlayers = state.players.sublist(1);
+    final activeIdleSlotIndex = state.turnCount % 2;
+    final activeIdleSlotTopLeft = _getTableSlotTopLeft(activeIdleSlotIndex);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.45),
-        border: Border(
-          bottom: BorderSide(
-            color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
-            width: 1,
-          ),
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Row(
-          children: [
-            // Turn Badge: "Your Turn" for human player, "<Bot Name>'s Turn" for bots
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-              decoration: BoxDecoration(
-                color: isHuman
-                    ? const Color(0xFF059669).withValues(alpha: 0.9)
-                    : const Color(0xFF1E293B).withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(7),
-                border: Border.all(
-                  color: isHuman ? const Color(0xFFFFD54F) : Colors.white24,
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isHuman ? Icons.person : Icons.sync_alt,
-                    color: Colors.white,
-                    size: 14,
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    isHuman ? 'Your Turn' : '${activePlayer.name}\'s Turn',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-
-            // Dynamic Winning Set Size Indicator Pill
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFD97706).withValues(alpha: 0.22),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: const Color(0xFFFFD54F).withValues(alpha: 0.45),
-                ),
-              ),
-              child: Text(
-                'Goal: ${state.totalPlayers}×',
-                style: const TextStyle(
-                  color: Color(0xFFFFE082),
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-
-            // Status message
-            Expanded(
-              child: Text(
-                widget.isDealing
-                    ? 'Shuffling & dealing balanced hands (1 of each country)...'
-                    : state.statusMessage,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: const Color(0xFFFFE082).withValues(alpha: 0.95),
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-
-            // Dedicated HUD Sound On/Off Toggle Button
-            IconButton(
-              icon: Icon(
-                widget.soundEnabled
-                    ? Icons.volume_up_rounded
-                    : Icons.volume_off_rounded,
-                color: widget.soundEnabled
-                    ? const Color(0xFFFFD54F)
-                    : Colors.white54,
-                size: 22,
-              ),
-              tooltip: widget.soundEnabled ? 'Mute Sound' : 'Enable Sound',
-              onPressed: widget.onToggleSound,
-            ),
-
-            // Pause / Menu button
-            IconButton(
-              icon: const Icon(
-                Icons.pause_rounded,
-                color: Color(0xFFFFD54F),
-                size: 22,
-              ),
-              tooltip: 'Game Menu',
-              onPressed: widget.onPause,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCentralTableArea(BuildContext context, Size cardSize) {
-    final state = widget.state;
-    final tableCard = state.tableCard;
-
-    return Center(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.32),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: const Color(0xFFD4AF37).withValues(alpha: 0.6),
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFFFD700).withValues(alpha: 0.14),
-              blurRadius: 20,
-              spreadRadius: 1,
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  tableCard.isStartingCard
-                      ? Icons.public
-                      : Icons.table_restaurant,
-                  color: const Color(0xFFFFD54F),
-                  size: 12,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  state.isOpeningMove ? 'STARTER CARD' : 'TABLE CARD',
-                  style: const TextStyle(
-                    color: Color(0xFFFFD54F),
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              transitionBuilder: (child, animation) {
-                return ScaleTransition(
-                  scale: CurvedAnimation(
-                    parent: animation,
-                    curve: Curves.easeOutBack,
-                  ),
-                  child: FadeTransition(opacity: animation, child: child),
-                );
-              },
-              child: CountryCardView(
-                key: ValueKey<String>(tableCard.id),
-                card: tableCard,
-                width: cardSize.width,
-                height: cardSize.height,
-                isLegal: true,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Renders smooth 2D arc trajectories for cards moving between players and the center table
-  /// using pre-built cached card widgets so zero card artwork rebuilds occur during the 60fps animation.
-  Widget _buildPassingCardsOverlay({
-    required double screenWidth,
-    required double screenHeight,
-    required Offset tableCenter,
-    required Size tableCardSize,
-  }) {
-    final t = _passCurve.value;
-    final playerIdx = _animatingPlayerIndex!;
-    final playerAnchor = _getPlayerAnchor(
-      playerIndex: playerIdx,
-      totalPlayers: widget.state.totalPlayers,
-      screenWidth: screenWidth,
-      screenHeight: screenHeight,
-    );
-
-    final movingWidth = tableCardSize.width * 0.85;
-    final movingHeight = movingWidth * 2.0;
-    _ensurePassingWidgetsCached(Size(movingWidth, movingHeight));
-
-    // 2D parabolic arc offset perpendicular to the path
-    final arcLift = math.sin(math.pi * t) * 34.0;
-
-    // 1. Discarded card: moves from playerAnchor -> tableCenter
-    final discardPos = Offset.lerp(playerAnchor, tableCenter, t)! +
-        Offset(arcLift * 0.6, -arcLift);
-
-    // 2. Taken card: moves from tableCenter -> playerAnchor
-    final takePos = Offset.lerp(tableCenter, playerAnchor, t)! +
-        Offset(-arcLift * 0.6, arcLift * 0.5);
-
-    return IgnorePointer(
+      width: double.infinity,
+      height: double.infinity,
+      color: const Color(0xFFBFE3A5),
       child: Stack(
+        fit: StackFit.expand,
         children: [
-          // Taken card moving from table to player's hand
-          if (_cachedTakenWidget != null)
-            Positioned(
-              left: takePos.dx - movingWidth / 2,
-              top: takePos.dy - movingHeight / 2,
-              child: Opacity(
-                opacity: (1.0 - t * 0.35).clamp(0.0, 1.0),
-                child: Transform.rotate(
-                  angle: (1.0 - t) * 0.14,
-                  child: _cachedTakenWidget!,
-                ),
+          // Full-viewport striped lawn background (--bg with repeating vertical stripes & radial glow)
+          const Positioned.fill(
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: StageLawnBackgroundPainter(),
+                isComplex: true,
+                willChange: false,
               ),
             ),
+          ),
 
-          // Discarded card moving from player's hand to center table
-          if (_cachedDiscardedWidget != null)
-            Positioned(
-              left: discardPos.dx - movingWidth / 2,
-              top: discardPos.dy - movingHeight / 2,
-              child: Opacity(
-                opacity: (0.3 + t * 0.7).clamp(0.0, 1.0),
-                child: Transform.rotate(
-                  angle: math.sin(math.pi * t) * -0.16,
-                  child: _cachedDiscardedWidget!,
+          // Horizontal 1920x1080 stage scaled cleanly via FittedBox (matching fit() in HTML)
+          Center(
+            child: FittedBox(
+              fit: BoxFit.contain,
+              alignment: Alignment.center,
+              child: SizedBox(
+                width: _stageWidth,
+                height: _stageHeight,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // 1. Top-Left Back/Menu Button (.btn at left: 90px, top: 60px)
+                    Positioned(
+                      left: 90,
+                      top: 60,
+                      width: 68,
+                      height: 68,
+                      child: _buildCircleButton(
+                        tooltip: 'Game Menu',
+                        onTap: widget.onPause,
+                        child: const CustomPaint(
+                          size: Size(30, 30),
+                          painter: _BackChevronIconPainter(),
+                        ),
+                      ),
+                    ),
+
+                    // 1b. Top-Left Quick Tutorial (?) Button (.btn at left: 176px, top: 60px)
+                    if (widget.onShowTutorial != null)
+                      Positioned(
+                        left: 176,
+                        top: 60,
+                        width: 68,
+                        height: 68,
+                        child: _buildCircleButton(
+                          tooltip: 'Quick Tutorial',
+                          onTap: widget.onShowTutorial!,
+                          child: const CustomPaint(
+                            size: Size(30, 30),
+                            painter: _TutorialHelpIconPainter(),
+                          ),
+                        ),
+                      ),
+
+                    // 2. Top-Right Player Stats & Sets Button (.btn at left: 1676px, top: 60px)
+                    if (widget.onShowStats != null)
+                      Positioned(
+                        left: 1676,
+                        top: 60,
+                        width: 68,
+                        height: 68,
+                        child: _buildCircleButton(
+                          tooltip: 'Player Stats & Sets',
+                          onTap: widget.onShowStats!,
+                          child: const CustomPaint(
+                            size: Size(30, 30),
+                            painter: _StatsTrophyIconPainter(),
+                          ),
+                        ),
+                      ),
+
+                    // 3. Top-Right Settings Button (.btn at left: 1762px, top: 60px)
+                    Positioned(
+                      left: 1762,
+                      top: 60,
+                      width: 68,
+                      height: 68,
+                      child: _buildCircleButton(
+                        tooltip: 'Settings & Controls',
+                        onTap: widget.onPause,
+                        child: const CustomPaint(
+                          size: Size(30, 30),
+                          painter: _SettingsGearIconPainter(),
+                        ),
+                      ),
+                    ),
+
+                    // 4. Dealing stack shown only during the initial deal animation
+                    if (widget.isDealing)
+                      const Positioned(
+                        left: 989,
+                        top: 453,
+                        width: 112,
+                        height: 164,
+                        child: CardBackView(
+                          width: 112,
+                          height: 164,
+                          showStackShadow: true,
+                        ),
+                      ),
+
+                    // 5. Stationary Current Table Card (when not in the middle of an exchange animation)
+                    if (!_isAnimatingExchange)
+                      Positioned(
+                        left: activeIdleSlotTopLeft.dx,
+                        top: activeIdleSlotTopLeft.dy,
+                        width: _cardWidth,
+                        height: _cardHeight,
+                        child: RepaintBoundary(
+                          child: _buildIdleTableCard(
+                            context,
+                            slotIndex: activeIdleSlotIndex,
+                          ),
+                        ),
+                      ),
+
+                    // 6. Opponent Avatars & Name Tags (#players — NO cards in front of bots)
+                    ..._buildOpponentAvatars(opponentPlayers),
+
+                    // 7. Human Player Bottom Hand (full hit-test box & zero gaps between cards)
+                    _buildHumanHandFan(humanPlayer),
+
+                    // 8. Realistic Video-Accurate Sequential Card Exchange Layer
+                    if (_isAnimatingExchange && _animatingPlayerIndex != null)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: RepaintBoundary(
+                            child: AnimatedBuilder(
+                              animation: _passController,
+                              builder: (context, _) {
+                                if (!_isAnimatingExchange) {
+                                  return const SizedBox.shrink();
+                                }
+                                return _buildRealisticExchangeOverlay();
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+
+                    // 9. Initial Shuffling & Dealing Animation Overlay
+                    if (widget.isDealing)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: RepaintBoundary(
+                            child: _buildDealingOverlay(),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
+          ),
         ],
       ),
     );
   }
 
-  /// Renders the initial shuffling and balanced hand dealing animation from center deck to all seats.
-  /// Driven by a localized AnimatedBuilder so the rest of PlayingTable does not rebuild on ticks.
-  Widget _buildDealingOverlay({
-    required double screenWidth,
-    required double screenHeight,
-    required Offset tableCenter,
+  Widget _buildCircleButton({
+    required String tooltip,
+    required VoidCallback onTap,
+    required Widget child,
   }) {
-    final state = widget.state;
-    final n = state.totalPlayers;
-    const sharedFlyingCard = CardBackView(width: 36);
-
-    // Precompute player seat anchors once per layout rather than inside the inner loop
-    final seatTargets = List<Offset>.generate(
-      n,
-      (playerIdx) => _getPlayerAnchor(
-        playerIndex: playerIdx,
-        totalPlayers: n,
-        screenWidth: screenWidth,
-        screenHeight: screenHeight,
-      ),
-      growable: false,
-    );
-
-    final dealingBanner = Positioned(
-      top: 56,
-      left: 20,
-      right: 20,
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
-          ),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.94),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: const Color(0xFFFFD700),
-              width: 1.2,
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: Container(
+            width: 68,
+            height: 68,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFFFFFFF),
+              border: Border.all(
+                color: const Color(0xFFDAD3F5),
+                width: 2,
+              ),
             ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.style,
-                color: Color(0xFFFFD54F),
-                size: 16,
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  'Dealing Balanced Hands • 1 Card of Each Country (${state.totalPlayers} Cards/Player)',
-                  style: const TextStyle(
-                    color: Color(0xFFFFE082),
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
+            alignment: Alignment.center,
+            child: child,
           ),
         ),
       ),
     );
+  }
 
-    Widget buildFrame(double progress, Widget? bannerChild) {
+  /// Renders the single current table card at its active slot (`state.turnCount % 2`) when idle.
+  Widget _buildIdleTableCard(BuildContext context, {required int slotIndex}) {
+    final state = widget.state;
+    final tableCard = state.tableCard;
+    final canInteract = !widget.isDealing &&
+        !widget.isProcessingMove &&
+        !_isAnimatingExchange &&
+        state.isHumanTurn;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        if (!canInteract) return;
+        if (_selectedCardId != null) {
+          final humanHand = state.players[0].hand;
+          final match =
+              humanHand.where((c) => c.id == _selectedCardId).toList();
+          if (match.isNotEmpty && state.isLegalDiscard(match.first)) {
+            HapticService.instance.cardTap();
+            AudioService.instance.playCardTap();
+            widget.onCardSelected(match.first);
+          }
+        }
+      },
+      child: CountryCardView(
+        key: ValueKey<String>(tableCard.id),
+        card: tableCard,
+        width: _cardWidth,
+        height: _cardHeight,
+        isLegal: true,
+      ),
+    );
+  }
+
+  List<Widget> _buildOpponentAvatars(List<GamePlayer> opponentPlayers) {
+    final widgets = <Widget>[];
+    final totalPlayers = widget.state.totalPlayers;
+
+    // While an exchange animation is in progress, keep the exchanging player highlighted
+    // until Phase 5 completes.
+    final activePlayerId = _isAnimatingExchange && _animatingPlayerIndex != null
+        ? _animatingPlayerIndex!
+        : widget.state.currentTurnPlayerIndex;
+
+    for (int i = 0; i < opponentPlayers.length; i++) {
+      final player = opponentPlayers[i];
+      final seat = _getOpponentStageSeat(i, totalPlayers);
+      final isCurrentTurn = !widget.isDealing && activePlayerId == player.id;
+      final isPlayerExchanging =
+          _isAnimatingExchange && _animatingPlayerIndex == player.id;
+      final isThinking =
+          isCurrentTurn && !player.isHuman && !widget.state.isGameOver;
+      final isWinner =
+          widget.state.isGameOver && widget.state.winner?.id == player.id;
+
+      widgets.add(
+        Positioned(
+          left: seat.avatarPos.dx - 78,
+          top: seat.avatarPos.dy - 56,
+          child: PlayerSeat(
+            key: ValueKey<int>(player.id),
+            player: player,
+            isCurrentTurn: isCurrentTurn,
+            isThinking: isThinking,
+            isExchanging: isPlayerExchanging,
+            isWinner: isWinner,
+            exchangeAnimation: isPlayerExchanging ? _passController : null,
+          ),
+        ),
+      );
+    }
+
+    return widgets;
+  }
+
+  /// Renders the human player's hand at bottom center inside a real 1100x250 hit-test box
+  /// so every card is 100% responsive to touch and mouse taps.
+  Widget _buildHumanHandFan(GamePlayer humanPlayer) {
+    final state = widget.state;
+    final activePlayerId = _isAnimatingExchange && _animatingPlayerIndex != null
+        ? _animatingPlayerIndex!
+        : state.currentTurnPlayerIndex;
+    final isHumanTurnActive = !widget.isDealing && activePlayerId == 0;
+    final canHumanAct = !widget.isDealing &&
+        !widget.isProcessingMove &&
+        !_isAnimatingExchange &&
+        state.isHumanTurn;
+    final cards = humanPlayer.hand;
+    final count = cards.length;
+    final handSpanWidth = count * (_cardWidth - 2.0) + 44.0;
+
+    final fanStack = SizedBox(
+      width: _handContainerWidth,
+      height: _handContainerHeight,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Subtle warm golden turn glow behind the human player's hand during their turn/exchange
+          if (isHumanTurnActive)
+            Positioned(
+              left: (_handContainerWidth - handSpanWidth) / 2.0,
+              top: 22.0,
+              width: handSpanWidth,
+              height: _cardHeight + 28.0,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: const Color(0xFFFFE082).withValues(alpha: 0.85),
+                      width: 3.0,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFFC83D).withValues(alpha: 0.55),
+                        blurRadius: 28,
+                        spreadRadius: 6,
+                      ),
+                      BoxShadow(
+                        color: const Color(0xFFFF9800).withValues(alpha: 0.32),
+                        blurRadius: 42,
+                        spreadRadius: 10,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          for (int i = 0; i < count; i++)
+            Builder(
+              builder: (context) {
+                // During a human card exchange (Phases 2–4), the active slot is vacated while
+                // the selected card slides onto the table and the previous table card is pulled back.
+                if (_isAnimatingExchange &&
+                    _animatingPlayerIndex == 0 &&
+                    _animatingHandIndex == i) {
+                  return const SizedBox.shrink();
+                }
+
+                final card = cards[i];
+                final slot = _fanSlot(i, count);
+                final isLegal = canHumanAct && state.isLegalDiscard(card);
+                final isSelected = _selectedCardId == card.id;
+
+                final cardLeft =
+                    (_handContainerWidth - _cardWidth) / 2.0 + slot.a;
+                final cardTop = 36.0 + slot.d;
+
+                return Positioned(
+                  left: cardLeft,
+                  top: cardTop,
+                  width: _cardWidth,
+                  height: _cardHeight,
+                  child: CountryCardView(
+                    key: ValueKey<String>(card.id),
+                    card: card,
+                    width: _cardWidth,
+                    height: _cardHeight,
+                    isLegal: !canHumanAct || isLegal,
+                    isSelected: isSelected,
+                    onTap: isLegal
+                        ? () {
+                            HapticService.instance.cardTap();
+                            AudioService.instance.playCardTap();
+                            widget.onCardSelected(card);
+                          }
+                        : null,
+                    onIllegalTap: canHumanAct && !isLegal
+                        ? () {
+                            HapticService.instance.invalidMove();
+                          }
+                        : null,
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+
+    Widget animatedHand;
+    if (widget.isDealing && widget.dealingAnimation != null) {
+      animatedHand = AnimatedBuilder(
+        animation: widget.dealingAnimation!,
+        child: fanStack,
+        builder: (context, child) {
+          final reveal =
+              ((widget.dealingAnimation!.value - 0.25) / 0.75).clamp(0.0, 1.0);
+          return Opacity(
+            opacity: reveal,
+            child: Transform.translate(
+              offset: Offset(0, (1.0 - reveal) * 40),
+              child: child,
+            ),
+          );
+        },
+      );
+    } else if (widget.isDealing) {
+      final reveal = ((widget.dealingProgress - 0.25) / 0.75).clamp(0.0, 1.0);
+      animatedHand = Opacity(
+        opacity: reveal,
+        child: Transform.translate(
+          offset: Offset(0, (1.0 - reveal) * 40),
+          child: fanStack,
+        ),
+      );
+    } else {
+      animatedHand = fanStack;
+    }
+
+    return Positioned(
+      left: _handContainerLeft,
+      top: _handContainerTop,
+      width: _handContainerWidth,
+      height: _handContainerHeight,
+      child: RepaintBoundary(
+        child: animatedHand,
+      ),
+    );
+  }
+
+  /// Renders the smooth, sequential, single-movement card exchange:
+  /// 1. Phase 2 (`0.00 -> 0.47`): The incoming card moves directly from `_lockedPlayerCardPos`
+  ///    to `_lockedIncomingTableSlotPos` using `Cubic(0.22, 1.0, 0.36, 1.0)`.
+  ///    The previous table card remains completely stationary at `_lockedOldTableSlotPos`.
+  /// 2. Phase 3 (`0.47 -> 0.53`): Incoming card has arrived completely; both cards rest stably
+  ///    at their table positions.
+  /// 3. Phase 4 (`0.53 -> 1.00`): Only after the incoming card has reached its final position,
+  ///    the previous table card moves directly from `_lockedOldTableSlotPos` to `_lockedPlayerCardPos`
+  ///    using `Cubic(0.22, 1.0, 0.36, 1.0)`, while the incoming card stays completely stationary.
+  Widget _buildRealisticExchangeOverlay() {
+    final p = _passController.value;
+
+    final Offset incomingPos;
+    final Offset outgoingPos;
+
+    if (p < _phase2End) {
+      final rawIn = (p / _phase2End).clamp(0.0, 1.0);
+      final tIn = _exchangeCurve.transform(rawIn);
+      incomingPos = Offset.lerp(
+        _lockedPlayerCardPos,
+        _lockedIncomingTableSlotPos,
+        tIn,
+      )!;
+      outgoingPos = _lockedOldTableSlotPos;
+    } else if (p < _phase4Start) {
+      incomingPos = _lockedIncomingTableSlotPos;
+      outgoingPos = _lockedOldTableSlotPos;
+    } else {
+      final rawOut =
+          ((p - _phase4Start) / (1.0 - _phase4Start)).clamp(0.0, 1.0);
+      final tOut = _exchangeCurve.transform(rawOut);
+      incomingPos = _lockedIncomingTableSlotPos;
+      outgoingPos = Offset.lerp(
+        _lockedOldTableSlotPos,
+        _lockedPlayerCardPos,
+        tOut,
+      )!;
+    }
+
+    final takenKey =
+        ValueKey<String>('exchange_taken_${_animatingTakenCard?.id ?? "old"}');
+    final discardedKey = ValueKey<String>(
+      'exchange_discarded_${_animatingDiscardedCard?.id ?? "new"}',
+    );
+
+    final takenLayer = _cachedTakenWidget != null
+        ? Positioned(
+            key: takenKey,
+            left: 0,
+            top: 0,
+            width: _cardWidth,
+            height: _cardHeight,
+            child: Transform.translate(
+              offset: outgoingPos,
+              child: _cachedTakenWidget!,
+            ),
+          )
+        : null;
+
+    final discardedLayer = _cachedDiscardedWidget != null
+        ? Positioned(
+            key: discardedKey,
+            left: 0,
+            top: 0,
+            width: _cardWidth,
+            height: _cardHeight,
+            child: Transform.translate(
+              offset: incomingPos,
+              child: _cachedDiscardedWidget!,
+            ),
+          )
+        : null;
+
+    // Keep the actively moving card on top while preserving Element identity via ValueKeys
+    final children = p < _phase4Start
+        ? <Widget>[
+            ?takenLayer,
+            ?discardedLayer,
+          ]
+        : <Widget>[
+            ?discardedLayer,
+            ?takenLayer,
+          ];
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: children,
+    );
+  }
+
+  /// Renders the initial dealing sequence from the center deck pile to all players.
+  Widget _buildDealingOverlay() {
+    final state = widget.state;
+    final n = state.totalPlayers;
+    const sharedFlyingCard = CardBackView(
+      width: 68,
+      height: 100,
+    );
+
+    final seatTargets = List<Offset>.generate(
+      n,
+      (playerIdx) => _getPlayerTargetAnchor(playerIdx, n),
+      growable: false,
+    );
+
+    Widget buildFrame(double progress) {
       final p = progress.clamp(0.0, 1.0);
       final flyingCards = <Widget>[];
       final denom = n * n * 1.4;
@@ -661,12 +924,12 @@ class _PlayingTableState extends State<PlayingTable>
           if (localT <= 0.0 || localT >= 1.0) continue;
 
           final curvedT = Curves.easeOutCubic.transform(localT);
-          final pos = Offset.lerp(tableCenter, seatTarget, curvedT)!;
+          final pos = Offset.lerp(_deckPileCenter, seatTarget, curvedT)!;
 
           flyingCards.add(
             Positioned(
-              left: pos.dx - 18,
-              top: pos.dy - 36,
+              left: pos.dx - 34,
+              top: pos.dy - 50,
               child: Transform.rotate(
                 angle: (1.0 - curvedT) * 0.4,
                 child: sharedFlyingCard,
@@ -676,288 +939,202 @@ class _PlayingTableState extends State<PlayingTable>
         }
       }
 
-      return IgnorePointer(
-        child: Stack(
-          children: [
-            ...flyingCards,
-            ?bannerChild,
-          ],
-        ),
+      return Stack(
+        clipBehavior: Clip.none,
+        children: flyingCards,
       );
     }
 
     if (widget.dealingAnimation != null) {
       return AnimatedBuilder(
         animation: widget.dealingAnimation!,
-        child: dealingBanner,
-        builder: (context, bannerChild) =>
-            buildFrame(widget.dealingAnimation!.value, bannerChild),
+        builder: (context, _) => buildFrame(widget.dealingAnimation!.value),
       );
     }
 
-    return buildFrame(widget.dealingProgress, dealingBanner);
-  }
-
-  List<Widget> _buildOpponentSeats({
-    required List<GamePlayer> opponentPlayers,
-    required double screenWidth,
-    required double screenHeight,
-  }) {
-    final widgets = <Widget>[];
-    final totalPlayers = widget.state.totalPlayers;
-    final topOffset = screenHeight < 600 ? 48.0 : 56.0;
-
-    if (totalPlayers == 4) {
-      widgets.add(
-        Positioned(
-          left: 14,
-          top: screenHeight * 0.36,
-          child: _seatWidget(opponentPlayers[0]),
-        ),
-      );
-      widgets.add(
-        Positioned(
-          top: topOffset,
-          left: screenWidth * 0.5 - 75,
-          child: _seatWidget(opponentPlayers[1]),
-        ),
-      );
-      widgets.add(
-        Positioned(
-          right: 14,
-          top: screenHeight * 0.36,
-          child: _seatWidget(opponentPlayers[2]),
-        ),
-      );
-    } else if (totalPlayers == 5) {
-      widgets.add(
-        Positioned(
-          left: 12,
-          top: screenHeight * 0.38,
-          child: _seatWidget(opponentPlayers[0], isCompact: true),
-        ),
-      );
-      widgets.add(
-        Positioned(
-          top: topOffset,
-          left: screenWidth * 0.20,
-          child: _seatWidget(opponentPlayers[1], isCompact: true),
-        ),
-      );
-      widgets.add(
-        Positioned(
-          top: topOffset,
-          right: screenWidth * 0.20,
-          child: _seatWidget(opponentPlayers[2], isCompact: true),
-        ),
-      );
-      widgets.add(
-        Positioned(
-          right: 12,
-          top: screenHeight * 0.38,
-          child: _seatWidget(opponentPlayers[3], isCompact: true),
-        ),
-      );
-    } else {
-      widgets.add(
-        Positioned(
-          left: 12,
-          bottom: screenHeight * 0.26,
-          child: _seatWidget(opponentPlayers[0], isCompact: true),
-        ),
-      );
-      widgets.add(
-        Positioned(
-          left: 14,
-          top: topOffset,
-          child: _seatWidget(opponentPlayers[1], isCompact: true),
-        ),
-      );
-      widgets.add(
-        Positioned(
-          top: topOffset,
-          left: screenWidth * 0.5 - 66,
-          child: _seatWidget(opponentPlayers[2], isCompact: true),
-        ),
-      );
-      widgets.add(
-        Positioned(
-          right: 14,
-          top: topOffset,
-          child: _seatWidget(opponentPlayers[3], isCompact: true),
-        ),
-      );
-      widgets.add(
-        Positioned(
-          right: 12,
-          bottom: screenHeight * 0.26,
-          child: _seatWidget(opponentPlayers[4], isCompact: true),
-        ),
-      );
-    }
-
-    return widgets;
-  }
-
-  Widget _seatWidget(GamePlayer player, {bool isCompact = false}) {
-    final state = widget.state;
-    final isCurrentTurn =
-        !widget.isDealing && state.currentTurnPlayerIndex == player.id;
-    final isThinking = isCurrentTurn && !player.isHuman && !state.isGameOver;
-
-    return PlayerSeat(
-      key: ValueKey<int>(player.id),
-      player: player,
-      isCurrentTurn: isCurrentTurn,
-      isThinking: isThinking,
-      isCompact: isCompact,
-    );
-  }
-
-  Widget _buildHumanHandArea({
-    required BuildContext context,
-    required GamePlayer humanPlayer,
-    required Size cardSize,
-  }) {
-    final state = widget.state;
-    final isHumanTurn = !widget.isDealing && state.isHumanTurn;
-
-    // Build the row of cards ONCE per state update; passed as static child during deal animation
-    final cardsScrollRow = SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          for (final card in humanPlayer.hand)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: _buildHumanCard(
-                card: card,
-                isHumanTurn: isHumanTurn,
-                cardSize: cardSize,
-              ),
-            ),
-        ],
-      ),
-    );
-
-    Widget animatedHandRow;
-    if (widget.isDealing && widget.dealingAnimation != null) {
-      animatedHandRow = AnimatedBuilder(
-        animation: widget.dealingAnimation!,
-        child: cardsScrollRow,
-        builder: (context, child) {
-          final reveal =
-              ((widget.dealingAnimation!.value - 0.25) / 0.75).clamp(0.0, 1.0);
-          return Opacity(
-            opacity: reveal,
-            child: Transform.translate(
-              offset: Offset(0, (1.0 - reveal) * 28),
-              child: child,
-            ),
-          );
-        },
-      );
-    } else if (widget.isDealing) {
-      final reveal = ((widget.dealingProgress - 0.25) / 0.75).clamp(0.0, 1.0);
-      animatedHandRow = Opacity(
-        opacity: reveal,
-        child: Transform.translate(
-          offset: Offset(0, (1.0 - reveal) * 28),
-          child: cardsScrollRow,
-        ),
-      );
-    } else {
-      animatedHandRow = cardsScrollRow;
-    }
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Helper hint when it's human's turn
-        if (isHumanTurn)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            margin: const EdgeInsets.only(bottom: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFD97706).withValues(alpha: 0.92),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white70, width: 0.8),
-            ),
-            child: Text(
-              state.isOpeningMove
-                  ? 'Opening Move: Tap any card to place on the table and take Global'
-                  : 'Tap a legal card to pass to the table and take ${state.tableCard.displayName}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 10.5,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-
-        animatedHandRow,
-      ],
-    );
-  }
-
-  Widget _buildHumanCard({
-    required GameCard card,
-    required bool isHumanTurn,
-    required Size cardSize,
-  }) {
-    final isLegal = isHumanTurn && widget.state.isLegalDiscard(card);
-
-    return CountryCardView(
-      key: ValueKey<String>(card.id),
-      card: card,
-      width: cardSize.width,
-      height: cardSize.height,
-      isLegal: !isHumanTurn || isLegal,
-      isSelected: false,
-      onTap: isLegal && !widget.isProcessingMove
-          ? () {
-              HapticService.instance.cardTap();
-              AudioService.instance.playCardTap();
-              widget.onCardSelected(card);
-            }
-          : null,
-      onIllegalTap: isHumanTurn && !isLegal && !widget.isProcessingMove
-          ? () {
-              HapticService.instance.invalidMove();
-            }
-          : null,
-    );
+    return buildFrame(widget.dealingProgress);
   }
 }
 
-class TableFeltPainter extends CustomPainter {
-  const TableFeltPainter();
+/// Paints the HTML `#stage` background:
+/// `background: repeating-linear-gradient(90deg,rgba(255,255,255,.14) 0 130px,rgba(255,255,255,0) 130px 260px), radial-gradient(ellipse at 50% 45%,rgba(255,255,255,.28),rgba(255,255,255,0) 70%), #BFE3A5`
+class StageLawnBackgroundPainter extends CustomPainter {
+  const StageLawnBackgroundPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final rect = Offset.zero & size;
+    canvas.drawRect(rect, Paint()..color = const Color(0xFFBFE3A5));
 
-    final borderPaint = Paint()
-      ..color = const Color(0xFFD4AF37).withValues(alpha: 0.22)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
+    // Repeating vertical stripes (scaled proportionally to viewport width)
+    final stripeWidth = size.width * (130.0 / 1920.0);
+    final period = stripeWidth * 2.0;
+    final stripePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.14)
+      ..style = PaintingStyle.fill;
 
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect.deflate(10), const Radius.circular(20)),
-      borderPaint,
-    );
+    for (double x = 0; x < size.width; x += period) {
+      canvas.drawRect(
+        Rect.fromLTWH(x, 0, stripeWidth, size.height),
+        stripePaint,
+      );
+    }
 
-    final center = Offset(size.width / 2, size.height * 0.46);
-    final ringPaint = Paint()
-      ..color = const Color(0xFFD4AF37).withValues(alpha: 0.14)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-
-    canvas.drawCircle(center, 110, ringPaint);
-    canvas.drawCircle(center, 85, ringPaint);
+    // Soft radial highlight at (50%, 45%)
+    final glowPaint = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(0.0, -0.1),
+        radius: 0.7,
+        colors: [
+          Colors.white.withValues(alpha: 0.28),
+          Colors.white.withValues(alpha: 0.0),
+        ],
+      ).createShader(rect);
+    canvas.drawRect(rect, glowPaint);
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
+
+/// Paints `<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>` from the HTML Back button.
+class _BackChevronIconPainter extends CustomPainter {
+  const _BackChevronIconPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width / 24.0;
+    final path = Path()
+      ..moveTo(15 * s, 5 * s)
+      ..lineTo(8 * s, 12 * s)
+      ..lineTo(15 * s, 19 * s);
+    final paint = Paint()
+      ..color = const Color(0xFF2A2160)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.4 * s
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Paints `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1"/></svg>`
+class _SettingsGearIconPainter extends CustomPainter {
+  const _SettingsGearIconPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width / 24.0;
+    final paint = Paint()
+      ..color = const Color(0xFF2A2160)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.4 * s
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    canvas.drawCircle(Offset(12 * s, 12 * s), 3 * s, paint);
+
+    final rays = Path()
+      ..moveTo(12 * s, 2.8 * s)
+      ..lineTo(12 * s, 5.8 * s)
+      ..moveTo(12 * s, 18.2 * s)
+      ..lineTo(12 * s, 21.2 * s)
+      ..moveTo(2.8 * s, 12 * s)
+      ..lineTo(5.8 * s, 12 * s)
+      ..moveTo(18.2 * s, 12 * s)
+      ..lineTo(21.2 * s, 12 * s)
+      ..moveTo(5.5 * s, 5.5 * s)
+      ..lineTo(7.6 * s, 7.6 * s)
+      ..moveTo(16.4 * s, 16.4 * s)
+      ..lineTo(18.5 * s, 18.5 * s)
+      ..moveTo(18.5 * s, 5.5 * s)
+      ..lineTo(16.4 * s, 7.6 * s)
+      ..moveTo(7.6 * s, 16.4 * s)
+      ..lineTo(5.5 * s, 18.5 * s);
+    canvas.drawPath(rays, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Paints a clean vector Trophy / Leaderboard icon matching the #2A2160 stroke style of the table buttons.
+class _StatsTrophyIconPainter extends CustomPainter {
+  const _StatsTrophyIconPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width / 24.0;
+    final paint = Paint()
+      ..color = const Color(0xFF2A2160)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2 * s
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    // Trophy cup body
+    final cup = Path()
+      ..moveTo(7 * s, 4 * s)
+      ..lineTo(17 * s, 4 * s)
+      ..lineTo(17 * s, 9.5 * s)
+      ..quadraticBezierTo(17 * s, 14.5 * s, 12 * s, 14.5 * s)
+      ..quadraticBezierTo(7 * s, 14.5 * s, 7 * s, 9.5 * s)
+      ..close();
+    canvas.drawPath(cup, paint);
+
+    // Left & right handles
+    final handles = Path()
+      ..moveTo(7 * s, 6 * s)
+      ..lineTo(4.2 * s, 6 * s)
+      ..quadraticBezierTo(4.2 * s, 10.5 * s, 7 * s, 10.5 * s)
+      ..moveTo(17 * s, 6 * s)
+      ..lineTo(19.8 * s, 6 * s)
+      ..quadraticBezierTo(19.8 * s, 10.5 * s, 17 * s, 10.5 * s);
+    canvas.drawPath(handles, paint);
+
+    // Stem & pedestal base
+    final base = Path()
+      ..moveTo(12 * s, 14.5 * s)
+      ..lineTo(12 * s, 19.5 * s)
+      ..moveTo(8 * s, 19.5 * s)
+      ..lineTo(16 * s, 19.5 * s);
+    canvas.drawPath(base, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Paints a crisp Question Mark / Tutorial Help icon matching the #2A2160 stroke style of the table buttons.
+class _TutorialHelpIconPainter extends CustomPainter {
+  const _TutorialHelpIconPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width / 24.0;
+    final strokePaint = Paint()
+      ..color = const Color(0xFF2A2160)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.4 * s
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final curve = Path()
+      ..moveTo(9.1 * s, 9.0 * s)
+      ..cubicTo(9.5 * s, 6.2 * s, 14.5 * s, 6.2 * s, 14.9 * s, 9.2 * s)
+      ..cubicTo(15.2 * s, 11.4 * s, 12.0 * s, 12.0 * s, 12.0 * s, 14.2 * s);
+    canvas.drawPath(curve, strokePaint);
+
+    final dotPaint = Paint()
+      ..color = const Color(0xFF2A2160)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(12.0 * s, 18.2 * s), 1.45 * s, dotPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+

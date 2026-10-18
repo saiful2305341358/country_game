@@ -20,6 +20,7 @@ class GameState {
 
   /// Metadata for the most recent card exchange to drive 2D table animations.
   final int? lastMovePlayerIndex;
+  final int? lastMoveHandIndex;
   final GameCard? lastTakenCard;
   final GameCard? lastDiscardedCard;
 
@@ -37,6 +38,7 @@ class GameState {
     required this.statusMessage,
     this.moveLog = const [],
     this.lastMovePlayerIndex,
+    this.lastMoveHandIndex,
     this.lastTakenCard,
     this.lastDiscardedCard,
   });
@@ -88,6 +90,7 @@ class GameState {
     String? statusMessage,
     List<String>? moveLog,
     int? lastMovePlayerIndex,
+    int? lastMoveHandIndex,
     GameCard? lastTakenCard,
     GameCard? lastDiscardedCard,
   }) {
@@ -106,6 +109,7 @@ class GameState {
       statusMessage: statusMessage ?? this.statusMessage,
       moveLog: moveLog ?? this.moveLog,
       lastMovePlayerIndex: lastMovePlayerIndex ?? this.lastMovePlayerIndex,
+      lastMoveHandIndex: lastMoveHandIndex ?? this.lastMoveHandIndex,
       lastTakenCard: lastTakenCard ?? this.lastTakenCard,
       lastDiscardedCard: lastDiscardedCard ?? this.lastDiscardedCard,
     );

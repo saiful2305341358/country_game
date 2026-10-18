@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/player_stats_overlay.dart';
 import 'player_selection_screen.dart';
 import 'settings_screen.dart';
 
@@ -161,6 +162,41 @@ class MainMenuScreen extends StatelessWidget {
                             context,
                             MaterialPageRoute(
                               builder: (_) => const SettingsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    // Player Stats & Sets Overlay Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton.icon(
+                        icon: const Icon(
+                          Icons.leaderboard_rounded,
+                          size: 19,
+                          color: Color(0xFFFFD54F),
+                        ),
+                        label: const Text(
+                          'PLAYER STATS & SETS',
+                          style: TextStyle(
+                            color: Color(0xFFFFE082),
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (dialogContext) => Dialog(
+                              backgroundColor: Colors.transparent,
+                              insetPadding: EdgeInsets.zero,
+                              child: PlayerStatsOverlay(
+                                onClose: () => Navigator.pop(dialogContext),
+                              ),
                             ),
                           );
                         },

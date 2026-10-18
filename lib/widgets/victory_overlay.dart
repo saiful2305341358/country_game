@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/card_type.dart';
 import '../models/game_card.dart';
 import '../models/game_player.dart';
+import '../services/audio_service.dart';
 import '../services/haptic_service.dart';
 import 'country_card_view.dart';
 
@@ -12,6 +13,7 @@ class VictoryOverlay extends StatelessWidget {
   final int turnCount;
   final VoidCallback onPlayAgain;
   final VoidCallback onMainMenu;
+  final VoidCallback? onViewStats;
 
   const VictoryOverlay({
     super.key,
@@ -21,6 +23,7 @@ class VictoryOverlay extends StatelessWidget {
     required this.turnCount,
     required this.onPlayAgain,
     required this.onMainMenu,
+    this.onViewStats,
   });
 
   @override
@@ -155,7 +158,31 @@ class VictoryOverlay extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 22),
+            if (onViewStats != null) ...[
+              const SizedBox(height: 10),
+              TextButton.icon(
+                onPressed: () {
+                  AudioService.instance.playButtonClick();
+                  HapticService.instance.uiTap();
+                  onViewStats!();
+                },
+                icon: const Icon(
+                  Icons.leaderboard_rounded,
+                  size: 16,
+                  color: Color(0xFFFFD54F),
+                ),
+                label: const Text(
+                  'View Games Played & Sets Completed per Player',
+                  style: TextStyle(
+                    color: Color(0xFFFFD54F),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 14),
 
             // Action Buttons: Main Menu & Play Again
             Row(
@@ -163,6 +190,7 @@ class VictoryOverlay extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () {
+                      AudioService.instance.playButtonClick();
                       HapticService.instance.uiTap();
                       onMainMenu();
                     },
@@ -181,6 +209,7 @@ class VictoryOverlay extends StatelessWidget {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
+                      AudioService.instance.playButtonClick();
                       HapticService.instance.cardPass();
                       onPlayAgain();
                     },

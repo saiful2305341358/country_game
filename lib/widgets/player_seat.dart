@@ -1,182 +1,483 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/game_player.dart';
-import 'card_back_view.dart';
 
-class PlayerSeat extends StatelessWidget {
+/// Renders a player avatar (`.pl`) and name badge (`.tag`) converted from the HTML table design,
+/// with an animated luminous turn indicator glow around the active/exchanging player's avatar.
+class PlayerSeat extends StatefulWidget {
   final GamePlayer player;
   final bool isCurrentTurn;
   final bool isThinking;
+  final bool isExchanging;
   final bool isWinner;
   final bool isCompact;
+  final Animation<double>? exchangeAnimation;
 
   const PlayerSeat({
     super.key,
     required this.player,
     required this.isCurrentTurn,
     this.isThinking = false,
+    this.isExchanging = false,
     this.isWinner = false,
     this.isCompact = false,
+    this.exchangeAnimation,
   });
 
   @override
+  State<PlayerSeat> createState() => _PlayerSeatState();
+}
+
+class _PlayerSeatState extends State<PlayerSeat>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _turnBloomController;
+
+  @override
+  void initState() {
+    super.initState();
+    _turnBloomController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+    if (_isActiveGlow) {
+      _turnBloomController.forward(from: 0.0);
+    }
+  }
+
+  bool get _isActiveGlow =>
+      widget.isCurrentTurn ||
+      widget.isThinking ||
+      widget.isExchanging ||
+      widget.isWinner;
+
+  @override
+  void didUpdateWidget(covariant PlayerSeat oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final wasActive = oldWidget.isCurrentTurn ||
+        oldWidget.isThinking ||
+        oldWidget.isExchanging ||
+        oldWidget.isWinner;
+    if (_isActiveGlow && !wasActive) {
+      _turnBloomController.forward(from: 0.0);
+    } else if (!_isActiveGlow && wasActive) {
+      _turnBloomController.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _turnBloomController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final avatarColor = _getAvatarColor(player.id);
-    final showTurnRing = isCurrentTurn || isThinking;
-    final sharedCardBack = CardBackView(width: isCompact ? 21 : 24);
+    final showTurnGlow = _isActiveGlow;
+    final listenable = widget.exchangeAnimation != null
+        ? Listenable.merge([_turnBloomController, widget.exchangeAnimation!])
+        : _turnBloomController;
+
+    final avatarArtwork = ClipOval(
+      child: CustomPaint(
+        size: const Size(102, 102),
+        painter: HtmlAvatarPainter(
+          avatarIndex: playerId,
+          isMe: widget.player.isHuman,
+        ),
+        isComplex: true,
+        willChange: false,
+      ),
+    );
 
     return RepaintBoundary(
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        constraints: BoxConstraints(maxWidth: isCompact ? 132 : 165),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: isCurrentTurn
-              ? const Color(0xFF1E293B).withValues(alpha: 0.96)
-              : const Color(0xFF0F172A).withValues(alpha: 0.82),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isWinner
-                ? const Color(0xFFFFD700)
-                : isCurrentTurn
-                    ? const Color(0xFFFFD54F)
-                    : Colors.white.withValues(alpha: 0.16),
-            width: isCurrentTurn ? 1.8 : 1.0,
-          ),
-          boxShadow: [
-            if (isCurrentTurn)
-              BoxShadow(
-                color: const Color(0xFFFFD54F).withValues(alpha: 0.30),
-                blurRadius: 12,
-                spreadRadius: 1,
-              ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header: Sleek circular loading ring around Bot Avatar during their turn + Realistic Name
-            Row(
-              mainAxisSize: MainAxisSize.min,
+      child: SizedBox(
+        width: 156,
+        height: 162,
+        child: AnimatedBuilder(
+          animation: listenable,
+          child: avatarArtwork,
+          builder: (context, cachedAvatar) {
+            final bloomT = _turnBloomController.value;
+            final bloomBoost = math.sin(bloomT * math.pi);
+            final exchangeT = widget.exchangeAnimation?.value ?? 0.0;
+            final exchangeBoost = widget.isExchanging
+                ? math.sin(exchangeT * math.pi).clamp(0.0, 1.0)
+                : 0.0;
+            final pulseIntensity =
+                (0.65 + 0.35 * math.max(bloomBoost, exchangeBoost))
+                    .clamp(0.0, 1.0);
+
+            return Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.topCenter,
               children: [
-                SizedBox(
-                  width: 34,
-                  height: 34,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Isolated RepaintBoundary so the 60fps ring animation only repaints this 34x34px box
-                      if (showTurnRing)
-                        RepaintBoundary(
-                          child: SizedBox(
-                            width: 34,
-                            height: 34,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.2,
-                              valueColor: const AlwaysStoppedAnimation<Color>(
-                                Color(0xFFFFD700),
-                              ),
-                              backgroundColor: const Color(0xFFFFD54F)
-                                  .withValues(alpha: 0.2),
-                            ),
-                          ),
-                        ),
-                      Container(
-                        width: 26,
-                        height: 26,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: player.isFemale
-                              ? const Color(0xFFBE185D)
-                              : avatarColor,
-                          border: Border.all(
-                            color: showTurnRing
-                                ? Colors.transparent
-                                : Colors.white70,
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Center(
-                          child: Icon(
-                            player.isFemale ? Icons.face_3 : Icons.face,
-                            color: Colors.white,
-                            size: 15,
-                          ),
+                // 1. Radiant outer halo & luminous turn ring behind the avatar (centered at (78, 56))
+                if (showTurnGlow)
+                  Positioned(
+                    top: -26,
+                    left: -4,
+                    width: 164,
+                    height: 164,
+                    child: IgnorePointer(
+                      child: CustomPaint(
+                        painter: ActiveAvatarTurnGlowPainter(
+                          intensity: pulseIntensity,
+                          isExchanging: widget.isExchanging,
+                          exchangeProgress: exchangeT,
+                          isWinner: widget.isWinner,
                         ),
                       ),
-                    ],
+                    ),
+                  ),
+
+                // 2. Avatar Circle with glowing multi-layered turn border & halo shadows
+                Positioned(
+                  top: 0,
+                  child: Container(
+                    width: 112,
+                    height: 112,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: showTurnGlow
+                            ? const Color(0xFFFFF176)
+                            : const Color(0xFFBFE3A5),
+                        width: showTurnGlow ? 5.5 : 5.0,
+                      ),
+                      boxShadow: [
+                        const BoxShadow(
+                          color: Color(0xFF2A2160),
+                          spreadRadius: 3,
+                          blurRadius: 0,
+                        ),
+                        if (showTurnGlow) ...[
+                          const BoxShadow(
+                            color: Color(0xFFFFC83D),
+                            spreadRadius: 10,
+                            blurRadius: 0,
+                          ),
+                          BoxShadow(
+                            color: const Color(0xFFFFD54F).withValues(
+                              alpha: 0.78 * pulseIntensity,
+                            ),
+                            spreadRadius: 12 + 4 * pulseIntensity,
+                            blurRadius: 22 + 10 * pulseIntensity,
+                          ),
+                          BoxShadow(
+                            color: const Color(0xFFFF9800).withValues(
+                              alpha: 0.48 * pulseIntensity,
+                            ),
+                            spreadRadius: 16 + 6 * pulseIntensity,
+                            blurRadius: 34 + 12 * pulseIntensity,
+                          ),
+                        ],
+                      ],
+                    ),
+                    child: cachedAvatar,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    player.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: isCurrentTurn
-                          ? const Color(0xFFFFE082)
-                          : Colors.white,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.3,
+
+                // 3. Subtle deliberation ("thinking") bubble shown while bot evaluates its card swap
+                if (widget.isThinking &&
+                    !widget.isExchanging &&
+                    !widget.isWinner)
+                  Positioned(
+                    top: -6,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2A2160),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFFFFE082),
+                          width: 2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.35),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 5,
+                            height: 5,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Color(0xFFFFE082),
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          Container(
+                            width: 5,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFFFFE082)
+                                  .withValues(alpha: 0.8),
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          Container(
+                            width: 5,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFFFFE082)
+                                  .withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                // 4. Name tag pill (.tag) positioned at y + 66 from avatar center (56 + 66 = 122)
+                Positioned(
+                  top: 120,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: showTurnGlow
+                          ? const Color(0xFFFFC83D)
+                          : const Color(0xFFFFFFFF),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: showTurnGlow
+                            ? const Color(0xFF2A2160)
+                            : const Color(0xFFDAD3F5),
+                        width: 2,
+                      ),
+                      boxShadow: showTurnGlow
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFFFFC83D).withValues(
+                                  alpha: 0.72 * pulseIntensity,
+                                ),
+                                blurRadius: 14,
+                                spreadRadius: 2,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Text(
+                      widget.player.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF2A2160),
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                        height: 1.25,
+                      ),
                     ),
                   ),
                 ),
               ],
-            ),
-
-            const SizedBox(height: 6),
-
-            // Hand preview: fanned card backs + card count badge
-            SizedBox(
-              height: isCompact ? 40 : 48,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (int i = 0; i < player.hand.length; i++)
-                    Align(
-                      widthFactor: 0.44,
-                      child: sharedCardBack,
-                    ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(5),
-                      border: Border.all(color: Colors.white24, width: 0.7),
-                    ),
-                    child: Text(
-                      '${player.cardCount}',
-                      style: const TextStyle(
-                        color: Color(0xFFFFD54F),
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Color _getAvatarColor(int id) {
-    const palette = [
-      Color(0xFF2563EB),
-      Color(0xFFD97706),
-      Color(0xFF059669),
-      Color(0xFF7C3AED),
-      Color(0xFFDC2626),
-      Color(0xFF0891B2),
-    ];
-    return palette[id % palette.length];
+  int get playerId => widget.player.id;
+}
+
+/// Paints a soft radial golden aura and luminous turn ring around the active player's avatar.
+class ActiveAvatarTurnGlowPainter extends CustomPainter {
+  final double intensity;
+  final bool isExchanging;
+  final double exchangeProgress;
+  final bool isWinner;
+
+  const ActiveAvatarTurnGlowPainter({
+    required this.intensity,
+    this.isExchanging = false,
+    this.exchangeProgress = 0.0,
+    this.isWinner = false,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2.0, size.height / 2.0);
+    final outerRadius = (size.width / 2.0) * (0.94 + 0.06 * intensity);
+
+    // 1. Soft radial bloom halo behind the avatar
+    final radialRect = Rect.fromCircle(center: center, radius: outerRadius);
+    final primaryGlowColor =
+        isWinner ? const Color(0xFF69F0AE) : const Color(0xFFFFE082);
+    final secondaryGlowColor =
+        isWinner ? const Color(0xFF00E676) : const Color(0xFFFFB300);
+
+    final radialPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          primaryGlowColor.withValues(alpha: 0.62 * intensity),
+          secondaryGlowColor.withValues(alpha: 0.36 * intensity),
+          secondaryGlowColor.withValues(alpha: 0.0),
+        ],
+        stops: const [0.55, 0.78, 1.0],
+      ).createShader(radialRect);
+    canvas.drawCircle(center, outerRadius, radialPaint);
+
+    // 2. Soft outer neon-gold ring around the chip border (zero offscreen MaskFilter.blur)
+    final ringRadius = 66.0 + 2.0 * intensity;
+    final outerHaloRingPaint = Paint()
+      ..color = primaryGlowColor.withValues(alpha: 0.45 * intensity)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 9.0;
+    canvas.drawCircle(center, ringRadius, outerHaloRingPaint);
+
+    // 3. Crisp bright highlight ring
+    final coreRingPaint = Paint()
+      ..color = const Color(0xFFFFFDE7).withValues(alpha: 0.88 * intensity)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.6;
+    canvas.drawCircle(center, 65.5, coreRingPaint);
+
+    // 4. Dynamic sweeping highlight arcs during card exchange
+    if (isExchanging) {
+      final arcRect = Rect.fromCircle(center: center, radius: 67.5);
+      final sweepAngle = math.pi * 0.65;
+      final baseAngle = -math.pi / 2.0 + (exchangeProgress * math.pi * 2.0);
+      final arcPaint = Paint()
+        ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.92)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4.0
+        ..strokeCap = StrokeCap.round;
+
+      canvas.drawArc(arcRect, baseAngle, sweepAngle, false, arcPaint);
+      canvas.drawArc(
+          arcRect, baseAngle + math.pi, sweepAngle, false, arcPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant ActiveAvatarTurnGlowPainter oldDelegate) {
+    return oldDelegate.intensity != intensity ||
+        oldDelegate.isExchanging != isExchanging ||
+        oldDelegate.exchangeProgress != exchangeProgress ||
+        oldDelegate.isWinner != isWinner;
+  }
+}
+
+/// Direct Dart Canvas conversion of the HTML `avatar(i, me)` SVG generator:
+/// ```js
+/// const skins=['#F7C9A0','#F2B48A','#FBD9BD'],bgs=['#8CC5B7','#90CAF9','#FDE7C8','#7FD3CF','#C9B8F5'];
+/// ```
+class HtmlAvatarPainter extends CustomPainter {
+  final int avatarIndex;
+  final bool isMe;
+
+  const HtmlAvatarPainter({
+    required this.avatarIndex,
+    this.isMe = false,
+  });
+
+  static const List<Color> _skins = [
+    Color(0xFFF7C9A0),
+    Color(0xFFF2B48A),
+    Color(0xFFFBD9BD),
+  ];
+
+  static const List<Color> _bgs = [
+    Color(0xFF8CC5B7),
+    Color(0xFF90CAF9),
+    Color(0xFFFDE7C8),
+    Color(0xFF7FD3CF),
+    Color(0xFFC9B8F5),
+  ];
+
+  static const List<Color> _hairs = [
+    Color(0xFF4A2C1D),
+    Color(0xFF2B1B12),
+    Color(0xFFF2C14E),
+  ];
+
+  static const List<Color> _shirts = [
+    Color(0xFF2A2160),
+    Color(0xFF14909A),
+    Color(0xFFFFB000),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final sx = size.width / 100.0;
+    final sy = size.height / 100.0;
+    canvas.save();
+    canvas.scale(sx, sy);
+
+    // 1. Background rect: <rect width="100" height="100" fill="${bg}"/>
+    final bgColor =
+        isMe ? const Color(0xFFBBD7F7) : _bgs[avatarIndex % _bgs.length];
+    canvas.drawRect(
+      const Rect.fromLTWH(0, 0, 100, 100),
+      Paint()..color = bgColor,
+    );
+
+    // 2. Shoulders: <path d="M18 100c2-22 16-30 32-30s30 8 32 30z"/>
+    final shirtColor =
+        isMe ? const Color(0xFF0B47C9) : _shirts[avatarIndex % _shirts.length];
+    final bodyPath = Path()
+      ..moveTo(18, 100)
+      ..cubicTo(20, 78, 34, 70, 50, 70)
+      ..cubicTo(66, 70, 80, 78, 82, 100)
+      ..close();
+    canvas.drawPath(bodyPath, Paint()..color = shirtColor);
+
+    // 3. Head circle: <circle cx="50" cy="44" r="19"/>
+    final skinColor =
+        isMe ? const Color(0xFF0B47C9) : _skins[avatarIndex % _skins.length];
+    canvas.drawCircle(
+      const Offset(50, 44),
+      19,
+      Paint()..color = skinColor,
+    );
+
+    if (!isMe) {
+      // 4. Hair: <path d="M30 44c-2-20 12-28 22-26 12 1 20 10 18 26-4-9-10-13-20-13s-16 5-20 13z"/>
+      final hairColor = _hairs[avatarIndex % _hairs.length];
+      final hairPath = Path()
+        ..moveTo(30, 44)
+        ..cubicTo(28, 24, 42, 16, 52, 18)
+        ..cubicTo(64, 19, 72, 28, 70, 44)
+        ..cubicTo(66, 35, 60, 31, 50, 31)
+        ..cubicTo(40, 31, 34, 36, 30, 44)
+        ..close();
+      canvas.drawPath(hairPath, Paint()..color = hairColor);
+
+      // 5. Eyes: <circle cx="43" cy="46" r="2"/> <circle cx="57" cy="46" r="2"/>
+      final inkPaint = Paint()..color = const Color(0xFF2A2160);
+      canvas.drawCircle(const Offset(43, 46), 2, inkPaint);
+      canvas.drawCircle(const Offset(57, 46), 2, inkPaint);
+
+      // 6. Smile: <path d="M44 54q6 5 12 0" stroke="#2A2160" stroke-width="2" fill="none" stroke-linecap="round"/>
+      final smilePath = Path()
+        ..moveTo(44, 54)
+        ..quadraticBezierTo(50, 59, 56, 54);
+      final smilePaint = Paint()
+        ..color = const Color(0xFF2A2160)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0
+        ..strokeCap = StrokeCap.round;
+      canvas.drawPath(smilePath, smilePaint);
+    }
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant HtmlAvatarPainter oldDelegate) {
+    return oldDelegate.avatarIndex != avatarIndex || oldDelegate.isMe != isMe;
   }
 }

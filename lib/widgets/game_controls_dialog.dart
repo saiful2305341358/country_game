@@ -6,6 +6,8 @@ class GameControlsDialog extends StatefulWidget {
   final VoidCallback onResume;
   final VoidCallback onRestart;
   final VoidCallback onMainMenu;
+  final VoidCallback? onShowStats;
+  final VoidCallback? onShowTutorial;
   final bool soundEnabled;
   final ValueChanged<bool> onSoundToggle;
   final bool hapticsEnabled;
@@ -16,6 +18,8 @@ class GameControlsDialog extends StatefulWidget {
     required this.onResume,
     required this.onRestart,
     required this.onMainMenu,
+    this.onShowStats,
+    this.onShowTutorial,
     required this.soundEnabled,
     required this.onSoundToggle,
     this.hapticsEnabled = true,
@@ -86,7 +90,7 @@ class _GameControlsDialogState extends State<GameControlsDialog> {
             ),
             const SizedBox(height: 18),
 
-            // Sound Toggle Row
+            // Sound & Haptics Toggle Container
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
@@ -184,6 +188,60 @@ class _GameControlsDialogState extends State<GameControlsDialog> {
               ),
             ),
             const SizedBox(height: 10),
+
+            if (widget.onShowStats != null) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.leaderboard_rounded, size: 18),
+                  label: const Text('Player Stats & Sets'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFFFE082),
+                    side: const BorderSide(
+                      color: Color(0xFFFFD54F),
+                      width: 1,
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: () {
+                    AudioService.instance.playButtonClick();
+                    HapticService.instance.uiTap();
+                    widget.onShowStats!();
+                  },
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+
+            if (widget.onShowTutorial != null) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.lightbulb_outline_rounded, size: 18),
+                  label: const Text('Quick Tutorial (How to Play)'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(
+                      color: Colors.white38,
+                      width: 1,
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: () {
+                    AudioService.instance.playButtonClick();
+                    HapticService.instance.uiTap();
+                    widget.onShowTutorial!();
+                  },
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
 
             // Restart button or confirm
             if (!_confirmRestart)

@@ -19,15 +19,20 @@ class GameEngine extends ChangeNotifier {
   Timer? _botTimer;
   int _gameSessionId = 0;
   bool _isProcessingMove = false;
+  bool _isExchangeAnimating = false;
   bool _isPaused = false;
+  final bool waitForExchangeAnimation;
 
-  GameEngine({GameSettings? initialSettings})
-      : _settings = initialSettings ?? GameSettings.current;
+  GameEngine({
+    GameSettings? initialSettings,
+    this.waitForExchangeAnimation = false,
+  }) : _settings = initialSettings ?? GameSettings.current;
 
   GameState? get state => _state;
   GameSettings get settings => _settings;
   bool get hasActiveGame => _state != null;
-  bool get isProcessingMove => _isProcessingMove;
+  bool get isProcessingMove => _isProcessingMove || _isExchangeAnimating;
+  bool get isExchangeAnimating => _isExchangeAnimating;
   bool get isPaused => _isPaused;
 
   void updateSettings(GameSettings newSettings) {
@@ -35,8 +40,8 @@ class GameEngine extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Starts a new game with [totalPlayers] (4, 5, or 6).
-  /// If [deferBotStart] is true, bot turns wait until [beginActivePlay] is called
+  /// Starts a new game with [totalPlayers] (3, 4, 5, or 6).
+  /// If [deferBotStart] is true, bot turns wait until [resumeActivePlay] is called
   /// (used while the initial card dealing animation plays on screen).
   void startNewGame({
     int? totalPlayers,
@@ -48,11 +53,12 @@ class GameEngine extends ChangeNotifier {
     _gameSessionId++;
     final currentSession = _gameSessionId;
     _isProcessingMove = false;
+    _isExchangeAnimating = false;
     _isPaused = deferBotStart;
 
     final n = totalPlayers ?? _settings.totalPlayers;
-    if (n < 4 || n > 6) {
-      throw ArgumentError('Invalid player count: $n. Must be 4, 5, or 6.');
+    if (n < 3 || n > 6) {
+      throw ArgumentError('Invalid player count: $n. Must be 3, 4, 5, or 6.');
     }
 
     final rng = randomSeed != null ? Random(randomSeed) : Random();
@@ -110,7 +116,19 @@ class GameEngine extends ChangeNotifier {
   void resumeActivePlay() {
     if (_state == null) return;
     _isPaused = false;
-    _triggerBotIfNeeded(_gameSessionId);
+    if (!_isExchangeAnimating) {
+      _triggerBotIfNeeded(_gameSessionId);
+    }
+  }
+
+  /// Called by the UI when both phases of the card exchange animation complete.
+  void completeExchangeAnimation() {
+    if (!_isExchangeAnimating) return;
+    _isExchangeAnimating = false;
+    notifyListeners();
+    if (!_isPaused) {
+      _triggerBotIfNeeded(_gameSessionId);
+    }
   }
 
   /// Pauses scheduled bot actions while pause dialog is open.
@@ -128,7 +146,9 @@ class GameEngine extends ChangeNotifier {
   /// Attempts to make a move for the active player.
   /// Discards [discardCard] and takes the current table card.
   bool makeMove(GameCard discardCard) {
-    if (_state == null || _isProcessingMove) return false;
+    if (_state == null || _isProcessingMove || _isExchangeAnimating) {
+      return false;
+    }
     final currentSession = _gameSessionId;
 
     final validation = MoveValidator.validateMove(
@@ -150,14 +170,14 @@ class GameEngine extends ChangeNotifier {
     final activePlayer = state.currentPlayer;
     final oldTableCard = state.tableCard;
 
-    // 1. Update active player's hand: remove discardCard, add oldTableCard
+    // 1. Update active player's hand in-place so card slot alignment is preserved
     final updatedHand = List<GameCard>.from(activePlayer.hand);
-    final removed = updatedHand.remove(discardCard);
-    if (!removed) {
+    final replacedIndex = updatedHand.indexOf(discardCard);
+    if (replacedIndex == -1) {
       _isProcessingMove = false;
       return false;
     }
-    updatedHand.add(oldTableCard);
+    updatedHand[replacedIndex] = oldTableCard;
 
     final updatedPlayer = activePlayer.copyWith(hand: updatedHand);
 
@@ -182,6 +202,9 @@ class GameEngine extends ChangeNotifier {
         ? <String>[...prevLogs.sublist(prevLogs.length - 23), logEntry]
         : <String>[...prevLogs, logEntry];
 
+    final shouldLockForAnimation =
+        waitForExchangeAnimation && _settings.animationsEnabled;
+
     if (hasWon) {
       _state = state.copyWith(
         players: updatedPlayers,
@@ -195,10 +218,12 @@ class GameEngine extends ChangeNotifier {
             : '🏆 ${updatedPlayer.name} collected all ${state.totalPlayers} ${winningType.displayName} cards and won the game!',
         moveLog: newMoveLog,
         lastMovePlayerIndex: activePlayerIndex,
+        lastMoveHandIndex: replacedIndex,
         lastTakenCard: oldTableCard,
         lastDiscardedCard: discardCard,
       );
       _isProcessingMove = false;
+      _isExchangeAnimating = shouldLockForAnimation;
       assert(verifyIntegrity());
       notifyListeners();
       return true;
@@ -222,38 +247,63 @@ class GameEngine extends ChangeNotifier {
       statusMessage: nextStatus,
       moveLog: newMoveLog,
       lastMovePlayerIndex: activePlayerIndex,
+      lastMoveHandIndex: replacedIndex,
       lastTakenCard: oldTableCard,
       lastDiscardedCard: discardCard,
     );
 
     _isProcessingMove = false;
+    _isExchangeAnimating = shouldLockForAnimation;
     assert(verifyIntegrity());
     notifyListeners();
 
-    // Trigger next bot move if next player is bot and game is not paused
-    if (!_isPaused) {
+    // Trigger next bot move only once exchange animation completes (or immediately if animations disabled)
+    if (!_isPaused && !_isExchangeAnimating) {
       _triggerBotIfNeeded(currentSession);
     }
     return true;
   }
 
   void _triggerBotIfNeeded(int sessionId) {
-    if (_state == null || _state!.isGameOver || _isPaused) return;
+    if (_state == null ||
+        _state!.isGameOver ||
+        _isPaused ||
+        _isExchangeAnimating) {
+      return;
+    }
     if (_state!.isHumanTurn) return;
 
     _cancelBotAction();
 
+    BotDecision? precomputedDecision;
+    try {
+      precomputedDecision = BotStrategy.evaluateDecision(
+        state: _state!,
+        baseDelayMs: _settings.botDelayMs,
+      );
+    } catch (_) {}
+
+    final int computedThinkMs = precomputedDecision?.thinkDelayMs ??
+        (_settings.botDelayMs * 0.48).round().clamp(480, 1100);
+
     final delay = _settings.animationsEnabled
-        ? Duration(milliseconds: _settings.botDelayMs)
+        ? Duration(
+            milliseconds: waitForExchangeAnimation
+                ? computedThinkMs
+                : _settings.botDelayMs,
+          )
         : const Duration(milliseconds: 100);
 
     _botTimer = Timer(delay, () {
-      if (_gameSessionId != sessionId || _isPaused) return;
+      if (_gameSessionId != sessionId || _isPaused || _isExchangeAnimating) {
+        return;
+      }
       if (_state == null || _state!.isGameOver) return;
       if (_state!.isHumanTurn) return;
 
       try {
-        final botDiscard = BotStrategy.chooseDiscard(state: _state!);
+        final botDiscard = precomputedDecision?.discardCard ??
+            BotStrategy.chooseDiscard(state: _state!);
         makeMove(botDiscard);
       } catch (e) {
         debugPrint('Error in bot move: $e');

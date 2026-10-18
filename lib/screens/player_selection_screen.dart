@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../game/card_deck_factory.dart';
 import '../models/card_type.dart';
 import '../models/game_card.dart';
+import '../services/audio_service.dart';
+import '../services/haptic_service.dart';
 import '../widgets/country_card_view.dart';
 import 'game_screen.dart';
 
@@ -30,6 +32,8 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
 
   void _onPlayerCountChanged(int count) {
     if (_selectedPlayers == count) return;
+    AudioService.instance.playButtonClick();
+    HapticService.instance.uiTap();
     setState(() {
       _selectedPlayers = count;
       _activeTypes = CardDeckFactory.selectActiveTypes(count);
@@ -101,21 +105,27 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
 
                     const SizedBox(height: 20),
 
-                    // Player Count Selector Cards (4, 5, 6)
+                    // Player Count Selector Cards (3, 4, 5, 6)
                     Row(
                       children: [
+                        _buildPlayerCountOption(
+                          3,
+                          '3 Players',
+                          'Win Set: 3× Cards',
+                        ),
+                        const SizedBox(width: 8),
                         _buildPlayerCountOption(
                           4,
                           '4 Players',
                           'Win Set: 4× Cards',
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         _buildPlayerCountOption(
                           5,
                           '5 Players',
                           'Win Set: 5× Cards',
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         _buildPlayerCountOption(
                           6,
                           '6 Players',
@@ -240,6 +250,8 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
                               const Color(0xFFD97706).withValues(alpha: 0.5),
                         ),
                         onPressed: () {
+                          AudioService.instance.playButtonClick();
+                          HapticService.instance.uiTap();
                           Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(

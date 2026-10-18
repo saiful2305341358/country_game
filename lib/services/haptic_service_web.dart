@@ -6,7 +6,17 @@ import 'haptic_service_interface.dart';
 HapticServiceInterface createHapticService() => HapticServiceWeb();
 
 class HapticServiceWeb implements HapticServiceInterface {
+  static const String _prefKey = 'country_game_haptics_enabled';
   bool _hapticsEnabled = true;
+
+  HapticServiceWeb() {
+    try {
+      final saved = html.window.localStorage[_prefKey];
+      if (saved != null) {
+        _hapticsEnabled = saved == 'true';
+      }
+    } catch (_) {}
+  }
 
   @override
   bool get isHapticsEnabled => _hapticsEnabled;
@@ -14,6 +24,9 @@ class HapticServiceWeb implements HapticServiceInterface {
   @override
   set isHapticsEnabled(bool enabled) {
     _hapticsEnabled = enabled;
+    try {
+      html.window.localStorage[_prefKey] = enabled.toString();
+    } catch (_) {}
   }
 
   void _vibratePattern(Object pattern) {

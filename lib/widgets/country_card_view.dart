@@ -36,6 +36,7 @@ class CountryCardView extends StatefulWidget {
 class _CountryCardViewState extends State<CountryCardView>
     with SingleTickerProviderStateMixin {
   bool _isPressed = false;
+  bool _isHovered = false;
   late final AnimationController _shakeController;
 
   @override
@@ -64,36 +65,36 @@ class _CountryCardViewState extends State<CountryCardView>
     final width = widget.width;
     final effectiveHeight = widget.effectiveHeight;
     final isSelected = widget.isSelected || _isPressed;
+    final isLifted = isSelected || _isHovered;
     final isLegal = widget.isLegal;
 
-    final borderAccent = card.isStartingCard
-        ? const Color(0xFF38BDF8)
-        : card.type!.accentColor;
+    final radius = (width * (14.0 / 128.0)).clamp(7.0, 18.0);
+    final borderWidth = (width * (5.0 / 128.0)).clamp(2.2, 5.5);
 
     Widget cardBody = RepaintBoundary(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(width * 0.10),
-        child: Container(
-          width: width,
-          height: effectiveHeight,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(width * 0.10),
-            border: Border.all(
-              color: isSelected
-                  ? const Color(0xFFFFD700)
-                  : borderAccent.withValues(alpha: 0.85),
-              width: isSelected ? 2.5 : 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: isSelected
-                    ? const Color(0xFFFFD700).withValues(alpha: 0.45)
-                    : Colors.black.withValues(alpha: 0.45),
-                blurRadius: isSelected ? 14 : 8,
-                offset: Offset(0, isSelected ? -4 : 3),
-              ),
-            ],
+      child: Container(
+        width: width,
+        height: effectiveHeight,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(radius),
+          border: Border.all(
+            color: isSelected ? const Color(0xFFFFC83D) : Colors.white,
+            width: borderWidth,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: isSelected
+                  ? const Color(0xFFFFC83D).withValues(alpha: 0.45)
+                  : const Color(0xFF140A32).withValues(alpha: 0.25),
+              blurRadius: isSelected ? 22 : 24,
+              offset: Offset(0, isSelected ? 4 : 10),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius:
+              BorderRadius.circular((radius - borderWidth).clamp(3.0, 14.0)),
           child: Stack(
             children: [
               // Background Artwork CustomPainter cached in GPU layer
@@ -116,7 +117,6 @@ class _CountryCardViewState extends State<CountryCardView>
                   child: Container(
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.68),
-                      borderRadius: BorderRadius.circular(width * 0.09),
                     ),
                     child: Center(
                       child: Container(
@@ -149,32 +149,49 @@ class _CountryCardViewState extends State<CountryCardView>
     );
 
     if (widget.onTap != null && isLegal) {
-      return GestureDetector(
-        onTapDown: (_) => setState(() => _isPressed = true),
-        onTapUp: (_) => setState(() => _isPressed = false),
-        onTapCancel: () => setState(() => _isPressed = false),
-        onTap: widget.onTap,
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: AnimatedScale(
-            duration: const Duration(milliseconds: 120),
-            scale: _isPressed ? 0.95 : (widget.isSelected ? 1.05 : 1.0),
-            child: cardBody,
+      final liftY = isLifted ? -18.0 * (width / 128.0) : 0.0;
+      return MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (_) => setState(() => _isPressed = true),
+          onTapUp: (_) => setState(() => _isPressed = false),
+          onTapCancel: () => setState(() => _isPressed = false),
+          onTap: widget.onTap,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0.0, end: liftY),
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOutCubic,
+            builder: (context, dy, child) {
+              return Transform.translate(
+                offset: Offset(0, dy),
+                child: child,
+              );
+            },
+            child: AnimatedScale(
+              duration: const Duration(milliseconds: 110),
+              scale: _isPressed ? 0.95 : 1.0,
+              child: cardBody,
+            ),
           ),
         ),
       );
     }
 
     if (!isLegal && widget.onIllegalTap != null) {
-      return GestureDetector(
-        onTap: _handleIllegalTap,
-        child: MouseRegion(
-          cursor: SystemMouseCursors.forbidden,
+      return MouseRegion(
+        cursor: SystemMouseCursors.forbidden,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _handleIllegalTap,
           child: AnimatedBuilder(
             animation: _shakeController,
             builder: (context, child) {
-              final dx =
-                  math.sin(_shakeController.value * math.pi * 4) * 5.0 * (1.0 - _shakeController.value);
+              final dx = math.sin(_shakeController.value * math.pi * 4) *
+                  5.0 *
+                  (1.0 - _shakeController.value);
               return Transform.translate(
                 offset: Offset(dx, 0),
                 child: child,

@@ -12,8 +12,8 @@ import 'package:country_game/game/bot_strategy.dart';
 import 'package:country_game/game/game_engine.dart';
 
 void main() {
-  group('1-3: Initialization & Dynamic Winning Set Size for 4, 5, 6 players', () {
-    for (final count in [4, 5, 6]) {
+  group('1-3: Initialization & Dynamic Winning Set Size for 3, 4, 5, 6 players', () {
+    for (final count in [3, 4, 5, 6]) {
       test('Initialization for $count players creates correct structures and winningSetSize=$count', () {
         final engine = GameEngine(
           initialSettings: const GameSettings(animationsEnabled: false),
@@ -37,6 +37,14 @@ void main() {
   });
 
   group('4-5: Dynamic Deck Generation (N x N + 1)', () {
+    test('3 players: 9 ordinary + 1 starting = 10 cards total', () {
+      final deck = CardDeckFactory.createDeck(3);
+      expect(deck.totalOrdinaryCards, equals(9));
+      expect(deck.totalCards, equals(10));
+      expect(deck.startingCard.isStartingCard, isTrue);
+      expect(deck.startingCard.displayName, equals('Global'));
+    });
+
     test('4 players: 16 ordinary + 1 starting = 17 cards total', () {
       final deck = CardDeckFactory.createDeck(4);
       expect(deck.totalOrdinaryCards, equals(16));
@@ -352,13 +360,18 @@ void main() {
       for (int i = 0; i < 20; i++) {
         if (engine.state!.isGameOver) break;
         final bot = engine.state!.currentPlayer;
-        final chosen = BotStrategy.chooseDiscard(state: engine.state!);
+        final decision = BotStrategy.evaluateDecision(
+          state: engine.state!,
+          baseDelayMs: 1650,
+        );
+        final chosen = decision.discardCard;
         final validation = MoveValidator.validateMove(
           state: engine.state!,
           discardCard: chosen,
         );
         expect(validation.isValid, isTrue);
         expect(bot.hand.contains(chosen), isTrue);
+        expect(decision.thinkDelayMs, inInclusiveRange(420, 1450));
         engine.makeMove(chosen);
       }
     });
