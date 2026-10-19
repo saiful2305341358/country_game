@@ -56,198 +56,211 @@ class TutorialModalOverlay extends StatelessWidget {
       child: Container(
         color: Colors.black.withValues(alpha: 0.54),
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        child: GestureDetector(
-          onTap: () {}, // Prevent taps inside the modal card from closing
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 500,
-            ),
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xF50F291E),
-                    Color(0xF8091B14),
-                    Color(0xFA07130E),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: SafeArea(
+          child: GestureDetector(
+            onTap: () {}, // Prevent taps inside the modal card from closing
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: 560,
+              ),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xF50F291E),
+                      Color(0xF8091B14),
+                      Color(0xFA07130E),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: const Color(0xFFFFD54F).withValues(alpha: 0.8),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.65),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: const Color(0xFFFFD54F).withValues(alpha: 0.8),
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.65),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header row
-                  Row(
-                    children: [
-                      Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color:
-                              const Color(0xFFFFD54F).withValues(alpha: 0.16),
-                          border: Border.all(
-                            color:
-                                const Color(0xFFFFD54F).withValues(alpha: 0.6),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header row
+                    Row(
+                      children: [
+                        Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFFFFD54F)
+                                .withValues(alpha: 0.16),
+                            border: Border.all(
+                              color: const Color(0xFFFFD54F)
+                                  .withValues(alpha: 0.6),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.lightbulb_outline_rounded,
+                            color: Color(0xFFFFD54F),
+                            size: 17,
                           ),
                         ),
-                        child: const Icon(
-                          Icons.lightbulb_outline_rounded,
-                          color: Color(0xFFFFD54F),
-                          size: 17,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'QUICK TUTORIAL • HOW TO PLAY',
-                              style: TextStyle(
-                                color: Color(0xFFFFE082),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.1,
-                              ),
-                            ),
-                            Text(
-                              'Swap cards with the table & collect a full country set to win',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 10.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 28,
-                          minHeight: 28,
-                        ),
-                        tooltip: 'Close Tutorial',
-                        onPressed: _handleDismiss,
-                        icon: const Icon(
-                          Icons.close_rounded,
-                          color: Colors.white70,
-                          size: 19,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Divider(color: Colors.white12, height: 1),
-                  const SizedBox(height: 8),
-
-                  // Step 1: How to Swap Cards
-                  _buildTutorialStep(
-                    stepNumber: '1',
-                    icon: Icons.swap_horiz_rounded,
-                    accentColor: const Color(0xFF34D399),
-                    title: 'Tap a Card to Swap with the Table',
-                    description:
-                        'On your turn (golden glow), tap any legal card in your hand. Your card slides onto the table first, then the previous table card slides into your hand.',
-                  ),
-                  const SizedBox(height: 6),
-
-                  // Step 2: Legal Swap Rule
-                  _buildTutorialStep(
-                    stepNumber: '2',
-                    icon: Icons.style_rounded,
-                    accentColor: const Color(0xFF60A5FA),
-                    title: 'Different Country Swap Rule',
-                    description:
-                        'You must play a different country than the card currently on the table. The special Starting Card can always be swapped.',
-                  ),
-                  const SizedBox(height: 6),
-
-                  // Step 3: How to Win
-                  _buildTutorialStep(
-                    stepNumber: '3',
-                    icon: Icons.emoji_events_rounded,
-                    accentColor: const Color(0xFFFFD54F),
-                    title: 'Collect $targetSetSize Matching Country Cards to Win',
-                    description:
-                        'Collect all $targetSetSize cards of the same country in your hand (excluding the Starting Card) to immediately win the round!',
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  // Footer row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Flexible(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.help_outline_rounded,
-                              color: Colors.white54,
-                              size: 14,
-                            ),
-                            SizedBox(width: 5),
-                            Flexible(
-                              child: Text(
-                                'Tap "?" anytime to reopen this guide',
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'QUICK TUTORIAL • HOW TO PLAY',
                                 style: TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 10,
+                                  color: Color(0xFFFFE082),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.1,
                                 ),
                               ),
+                              Text(
+                                'Swap cards with the table & collect a full country set to win',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 10.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 28,
+                            minHeight: 28,
+                          ),
+                          tooltip: 'Close Tutorial',
+                          onPressed: _handleDismiss,
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white70,
+                            size: 19,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Divider(color: Colors.white12, height: 1),
+                    const SizedBox(height: 8),
+
+                    // Scrollable Steps Body for compact landscape heights
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Step 1: How to Swap Cards
+                            _buildTutorialStep(
+                              stepNumber: '1',
+                              icon: Icons.swap_horiz_rounded,
+                              accentColor: const Color(0xFF34D399),
+                              title: 'Tap a Card to Swap with the Table',
+                              description:
+                                  'On your turn (golden glow), tap any legal card in your hand. Your card slides onto the table first, then the previous table card slides into your hand.',
+                            ),
+                            const SizedBox(height: 6),
+
+                            // Step 2: Legal Swap Rule
+                            _buildTutorialStep(
+                              stepNumber: '2',
+                              icon: Icons.style_rounded,
+                              accentColor: const Color(0xFF60A5FA),
+                              title: 'Different Country Swap Rule',
+                              description:
+                                  'You must play a different country than the card currently on the table. The special Starting Card can always be swapped.',
+                            ),
+                            const SizedBox(height: 6),
+
+                            // Step 3: How to Win
+                            _buildTutorialStep(
+                              stepNumber: '3',
+                              icon: Icons.emoji_events_rounded,
+                              accentColor: const Color(0xFFFFD54F),
+                              title:
+                                  'Collect $targetSetSize Matching Country Cards to Win',
+                              description:
+                                  'Collect all $targetSetSize cards of the same country in your hand (excluding the Starting Card) to immediately win the round!',
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      ElevatedButton.icon(
-                        onPressed: _handleDismiss,
-                        icon: const Icon(
-                          Icons.check_circle_outline_rounded,
-                          size: 16,
-                        ),
-                        label: const Text(
-                          'Got It, Let\'s Play!',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12,
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Footer row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Flexible(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.help_outline_rounded,
+                                color: Colors.white54,
+                                size: 14,
+                              ),
+                              SizedBox(width: 5),
+                              Flexible(
+                                child: Text(
+                                  'Tap "?" anytime to reopen this guide',
+                                  style: TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFD97706),
-                          foregroundColor: Colors.white,
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
+                        const SizedBox(width: 10),
+                        ElevatedButton.icon(
+                          onPressed: _handleDismiss,
+                          icon: const Icon(
+                            Icons.check_circle_outline_rounded,
+                            size: 16,
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                          label: const Text(
+                            'Got It, Let\'s Play!',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFD97706),
+                            foregroundColor: Colors.white,
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

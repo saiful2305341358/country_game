@@ -21,6 +21,13 @@ import UIKit
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
+  override func application(
+    _ application: UIApplication,
+    supportedInterfaceOrientationsFor window: UIWindow?
+  ) -> UIInterfaceOrientationMask {
+    return .landscape
+  }
+
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
 
@@ -98,37 +105,31 @@ import UIKit
     do {
       activePlayers.removeAll { !$0.isPlaying }
       let player = try AVAudioPlayer(data: data)
-      player.volume = 1.0
       player.prepareToPlay()
       player.play()
       activePlayers.append(player)
     } catch {
+      // Ignore playback errors
     }
   }
 
   private func triggerHaptic(style: String) {
-    DispatchQueue.main.async { [weak self] in
-      guard let self = self else { return }
-      switch style {
-      case "light":
-        self.lightImpactGenerator.prepare()
-        self.lightImpactGenerator.impactOccurred()
-      case "selection":
-        self.selectionGenerator.prepare()
-        self.selectionGenerator.selectionChanged()
-      case "success":
-        self.notificationGenerator.prepare()
-        self.notificationGenerator.notificationOccurred(.success)
-      case "warning":
-        self.notificationGenerator.prepare()
-        self.notificationGenerator.notificationOccurred(.warning)
-      case "error":
-        self.notificationGenerator.prepare()
-        self.notificationGenerator.notificationOccurred(.error)
-      default:
-        self.mediumImpactGenerator.prepare()
-        self.mediumImpactGenerator.impactOccurred()
-      }
+    switch style {
+    case "light":
+      lightImpactGenerator.prepare()
+      lightImpactGenerator.impactOccurred()
+    case "selection":
+      selectionGenerator.prepare()
+      selectionGenerator.selectionChanged()
+    case "success":
+      notificationGenerator.prepare()
+      notificationGenerator.notificationOccurred(.success)
+    case "warning":
+      notificationGenerator.prepare()
+      notificationGenerator.notificationOccurred(.warning)
+    default:
+      mediumImpactGenerator.prepare()
+      mediumImpactGenerator.impactOccurred()
     }
   }
 }

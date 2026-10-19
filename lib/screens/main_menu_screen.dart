@@ -24,220 +24,258 @@ class MainMenuScreen extends StatelessWidget {
           ),
         ),
         child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 440),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // App Logo: Vector Card Crest with Globe
-                    _buildAppLogo(),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final availW = constraints.maxWidth;
+              final availH = constraints.maxHeight;
+              final isCompactH = availH < 400;
 
-                    const SizedBox(height: 20),
-
-                    // Game Title
-                    const Text(
-                      'COUNTRY GAME',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Color(0xFFFFD700),
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 3,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black87,
-                            blurRadius: 10,
-                            offset: Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    // Dynamic Tagline (No hardcoded "Four" or "4")
-                    const Text(
-                      'Unite the Nations: Collect all cards of a country to conquer the round!',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Color(0xFFFFE082),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        height: 1.35,
-                        letterSpacing: 0.4,
-                      ),
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    // Play Button (Muted on Home Page per audio scope rules)
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.play_circle_fill, size: 26),
-                        label: const Text(
-                          'PLAY GAME',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFD97706),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          elevation: 6,
-                          shadowColor:
-                              const Color(0xFFD97706).withValues(alpha: 0.5),
-                        ),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const PlayerSelectionScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // Bilingual How to Play & Rules Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.help_outline, size: 20),
-                        label: const Text(
-                          'HOW TO PLAY & RULES',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFFFFE082),
-                          side: const BorderSide(
-                            color: Color(0xFFD4AF37),
-                            width: 1.2,
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: () => _showRulesDialog(context),
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // Settings Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: TextButton.icon(
-                        icon: const Icon(Icons.settings, size: 20),
-                        label: const Text(
-                          'SETTINGS',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.white70,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const SettingsScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-
-                    const SizedBox(height: 6),
-
-                    // Player Stats & Sets Overlay Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: TextButton.icon(
-                        icon: const Icon(
-                          Icons.leaderboard_rounded,
-                          size: 19,
-                          color: Color(0xFFFFD54F),
-                        ),
-                        label: const Text(
-                          'PLAYER STATS & SETS',
-                          style: TextStyle(
-                            color: Color(0xFFFFE082),
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (dialogContext) => Dialog(
-                              backgroundColor: Colors.transparent,
-                              insetPadding: EdgeInsets.zero,
-                              child: PlayerStatsOverlay(
-                                onClose: () => Navigator.pop(dialogContext),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-
-                    const SizedBox(height: 22),
-
-                    // Offline status indicator
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+              return Center(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: availW < 640 ? 20 : 32,
+                    vertical: isCompactH ? 10 : 16,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 820),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        const Icon(
-                          Icons.offline_pin,
-                          color: Color(0xFF10B981),
-                          size: 16,
+                        // Left Column: Brand Crest, Game Title, Dynamic Tagline & Offline Badge
+                        Expanded(
+                          flex: 11,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildAppLogo(size: isCompactH ? 82 : 96),
+                              SizedBox(height: isCompactH ? 12 : 16),
+                              Text(
+                                'COUNTRY GAME',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: const Color(0xFFFFD700),
+                                  fontSize: isCompactH ? 24 : 28,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 3,
+                                  shadows: const [
+                                    Shadow(
+                                      color: Colors.black87,
+                                      blurRadius: 10,
+                                      offset: Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              const Text(
+                                'Unite the Nations: Collect all cards of a country to conquer the round!',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Color(0xFFFFE082),
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w500,
+                                  height: 1.35,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                              SizedBox(height: isCompactH ? 12 : 16),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.offline_pin,
+                                    color: Color(0xFF10B981),
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      '100% Offline • No Network Required',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color:
+                                            Colors.white.withValues(alpha: 0.6),
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '100% Offline • No Network Required',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.6),
-                            fontSize: 11,
+
+                        SizedBox(width: availW < 680 ? 24 : 36),
+
+                        // Right Column: Primary Navigation & Overlays
+                        Expanded(
+                          flex: 10,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Play Button (Muted on Home Page per audio scope rules)
+                              ElevatedButton.icon(
+                                icon: Icon(
+                                  Icons.play_circle_fill,
+                                  size: isCompactH ? 22 : 26,
+                                ),
+                                label: Text(
+                                  'PLAY GAME',
+                                  style: TextStyle(
+                                    fontSize: isCompactH ? 14.5 : 16,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFD97706),
+                                  foregroundColor: Colors.white,
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: isCompactH ? 13 : 15,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  elevation: 6,
+                                  shadowColor: const Color(0xFFD97706)
+                                      .withValues(alpha: 0.5),
+                                ),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const PlayerSelectionScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              SizedBox(height: isCompactH ? 10 : 12),
+
+                              // Bilingual How to Play & Rules Button
+                              OutlinedButton.icon(
+                                icon: const Icon(Icons.help_outline, size: 19),
+                                label: const Text(
+                                  'HOW TO PLAY & RULES',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFFFFE082),
+                                  side: const BorderSide(
+                                    color: Color(0xFFD4AF37),
+                                    width: 1.2,
+                                  ),
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: isCompactH ? 11 : 13,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: () => _showRulesDialog(context),
+                              ),
+
+                              SizedBox(height: isCompactH ? 10 : 12),
+
+                              // Settings Button
+                              OutlinedButton.icon(
+                                icon: const Icon(Icons.settings, size: 19),
+                                label: const Text(
+                                  'SETTINGS',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.white70,
+                                  side: const BorderSide(
+                                    color: Colors.white24,
+                                    width: 1.0,
+                                  ),
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: isCompactH ? 10 : 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const SettingsScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              SizedBox(height: isCompactH ? 8 : 10),
+
+                              // Player Stats & Sets Overlay Button
+                              TextButton.icon(
+                                icon: const Icon(
+                                  Icons.leaderboard_rounded,
+                                  size: 19,
+                                  color: Color(0xFFFFD54F),
+                                ),
+                                label: const Text(
+                                  'PLAYER STATS & SETS',
+                                  style: TextStyle(
+                                    color: Color(0xFFFFE082),
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: isCompactH ? 8 : 10,
+                                  ),
+                                ),
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (dialogContext) => Dialog(
+                                      backgroundColor: Colors.transparent,
+                                      insetPadding: EdgeInsets.zero,
+                                      child: PlayerStatsOverlay(
+                                        onClose: () =>
+                                            Navigator.pop(dialogContext),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),
     );
   }
 
-  Widget _buildAppLogo() {
+  Widget _buildAppLogo({double size = 96}) {
+    final scale = size / 100.0;
     return Container(
-      width: 100,
-      height: 100,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: const RadialGradient(
@@ -265,8 +303,8 @@ class MainMenuScreen extends StatelessWidget {
             Transform.rotate(
               angle: -0.25,
               child: Container(
-                width: 32,
-                height: 50,
+                width: 32 * scale,
+                height: 50 * scale,
                 decoration: BoxDecoration(
                   color: const Color(0xFFD97706),
                   borderRadius: BorderRadius.circular(4),
@@ -277,8 +315,8 @@ class MainMenuScreen extends StatelessWidget {
             Transform.rotate(
               angle: 0.25,
               child: Container(
-                width: 32,
-                height: 50,
+                width: 32 * scale,
+                height: 50 * scale,
                 decoration: BoxDecoration(
                   color: const Color(0xFF2563EB),
                   borderRadius: BorderRadius.circular(4),
@@ -287,8 +325,8 @@ class MainMenuScreen extends StatelessWidget {
               ),
             ),
             Container(
-              width: 34,
-              height: 54,
+              width: 34 * scale,
+              height: 54 * scale,
               decoration: BoxDecoration(
                 color: const Color(0xFF0F172A),
                 borderRadius: BorderRadius.circular(4),
@@ -300,11 +338,11 @@ class MainMenuScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              child: const Center(
+              child: Center(
                 child: Icon(
                   Icons.public,
-                  color: Color(0xFF38BDF8),
-                  size: 20,
+                  color: const Color(0xFF38BDF8),
+                  size: 20 * scale,
                 ),
               ),
             ),
@@ -335,17 +373,23 @@ class _BilingualRulesDialogState extends State<BilingualRulesDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final screenH = MediaQuery.sizeOf(context).height;
+    final isCompactH = screenH < 420;
+
     return Dialog(
       backgroundColor: const Color(0xFF0F172A),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: 20,
+        vertical: isCompactH ? 10 : 20,
+      ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
         side: const BorderSide(color: Color(0xFFD4AF37), width: 1.4),
       ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 620),
+        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 540),
         child: Padding(
-          padding: const EdgeInsets.all(22),
+          padding: EdgeInsets.all(isCompactH ? 14 : 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -358,18 +402,18 @@ class _BilingualRulesDialogState extends State<BilingualRulesDialog> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.menu_book_rounded,
-                          color: Color(0xFFFFD54F),
-                          size: 24,
+                          color: const Color(0xFFFFD54F),
+                          size: isCompactH ? 20 : 24,
                         ),
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
                             _isBangla ? 'খেলার নিয়মাবলী' : 'How to Play & Rules',
-                            style: const TextStyle(
-                              color: Color(0xFFFFD54F),
-                              fontSize: 18,
+                            style: TextStyle(
+                              color: const Color(0xFFFFD54F),
+                              fontSize: isCompactH ? 16 : 18,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -407,9 +451,9 @@ class _BilingualRulesDialogState extends State<BilingualRulesDialog> {
                 ],
               ),
 
-              const SizedBox(height: 16),
+              SizedBox(height: isCompactH ? 8 : 12),
               const Divider(color: Colors.white12, height: 1),
-              const SizedBox(height: 14),
+              SizedBox(height: isCompactH ? 8 : 12),
 
               // Rules Body
               Flexible(
@@ -420,7 +464,7 @@ class _BilingualRulesDialogState extends State<BilingualRulesDialog> {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              SizedBox(height: isCompactH ? 8 : 12),
 
               // Close Action
               Align(
@@ -429,9 +473,9 @@ class _BilingualRulesDialogState extends State<BilingualRulesDialog> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFD97706),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 22,
+                      vertical: isCompactH ? 8 : 11,
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -460,7 +504,7 @@ class _BilingualRulesDialogState extends State<BilingualRulesDialog> {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
           color: selected ? const Color(0xFFD97706) : Colors.transparent,
           borderRadius: BorderRadius.circular(7),
@@ -566,9 +610,9 @@ class _RuleSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(11),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(10),
@@ -586,20 +630,20 @@ class _RuleSection extends StatelessWidget {
                     title,
                     style: const TextStyle(
                       color: Color(0xFFFFE082),
-                      fontSize: 13.5,
+                      fontSize: 13,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 5),
             Text(
               body,
               style: const TextStyle(
                 color: Colors.white70,
-                fontSize: 12,
-                height: 1.45,
+                fontSize: 11.8,
+                height: 1.4,
               ),
             ),
           ],

@@ -331,21 +331,6 @@ class _GameScreenState extends State<GameScreen>
             );
           });
         },
-        onShowStats: () {
-          Navigator.pop(context);
-          setState(() {
-            _showTutorialOverlay = false;
-            _showStatsOverlay = true;
-          });
-        },
-        onShowTutorial: () {
-          Navigator.pop(context);
-          setState(() {
-            _showStatsOverlay = false;
-            _showTutorialOverlay = true;
-            _tutorialPausedEngine = true;
-          });
-        },
         onResume: () {
           Navigator.pop(context);
           if (!_isDealing && !_showStatsOverlay && !_tutorialPausedEngine) {
@@ -395,91 +380,75 @@ class _GameScreenState extends State<GameScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFFBFE3A5),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isPortraitViewport =
-              constraints.maxWidth < constraints.maxHeight;
+      body: Stack(
+        children: [
+          // 1. Main Horizontal Playing Table with localized Dealing & Sequential Exchange Animation layers
+          PlayingTable(
+            state: state,
+            isProcessingMove: _engine.isProcessingMove,
+            isDealing: _isDealing,
+            dealingProgress: _dealingController.value,
+            dealingAnimation: _dealingController,
+            animationsEnabled: GameSettings.current.animationsEnabled,
+            onCardSelected: _onCardSelected,
+            onExchangeAnimationComplete: _onExchangeAnimationComplete,
+            onPause: _showPauseDialog,
+            onShowStats: _openStatsOverlay,
+            onShowTutorial: _openTutorialOverlay,
+          ),
 
-          final tableStack = Stack(
-            children: [
-              // 1. Main Horizontal Playing Table with localized Dealing & Sequential Exchange Animation layers
-              PlayingTable(
-                state: state,
-                isProcessingMove: _engine.isProcessingMove,
-                isDealing: _isDealing,
-                dealingProgress: _dealingController.value,
-                dealingAnimation: _dealingController,
-                animationsEnabled: GameSettings.current.animationsEnabled,
-                onCardSelected: _onCardSelected,
-                onExchangeAnimationComplete: _onExchangeAnimationComplete,
-                onPause: _showPauseDialog,
-                onShowStats: _openStatsOverlay,
-                onShowTutorial: _openTutorialOverlay,
+          // 2. Victory Overlay (shown once the winning exchange animation finishes)
+          if (showVictoryModal && !_showStatsOverlay && !_showTutorialOverlay)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.72),
+                child: VictoryOverlay(
+                  winner: state.winner!,
+                  winningType: state.winningType!,
+                  totalPlayers: state.totalPlayers,
+                  turnCount: state.turnCount,
+                  onPlayAgain: _startMatch,
+                  onViewStats: () => setState(() => _showStatsOverlay = true),
+                  onMainMenu: () {
+                    _engine.leaveGame();
+                    Navigator.pop(context);
+                  },
+                ),
               ),
+            ),
 
-              // 2. Victory Overlay (shown once the winning exchange animation finishes)
-              if (showVictoryModal && !_showStatsOverlay && !_showTutorialOverlay)
-                Positioned.fill(
-                  child: Container(
-                    color: Colors.black.withValues(alpha: 0.72),
-                    child: VictoryOverlay(
-                      winner: state.winner!,
-                      winningType: state.winningType!,
-                      totalPlayers: state.totalPlayers,
-                      turnCount: state.turnCount,
-                      onPlayAgain: _startMatch,
-                      onViewStats: () => setState(() => _showStatsOverlay = true),
-                      onMainMenu: () {
-                        _engine.leaveGame();
-                        Navigator.pop(context);
-                      },
-                    ),
-                  ),
+          // 3. Player Stats & Sets Completed Overlay
+          if (_showStatsOverlay)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.76),
+                child: PlayerStatsOverlay(
+                  activePlayers: state.players,
+                  targetSetSize: state.totalPlayers,
+                  onClose: _closeStatsOverlay,
                 ),
+              ),
+            ),
 
-              // 3. Player Stats & Sets Completed Overlay
-              if (_showStatsOverlay)
-                Positioned.fill(
-                  child: Container(
-                    color: Colors.black.withValues(alpha: 0.76),
-                    child: PlayerStatsOverlay(
-                      activePlayers: state.players,
-                      targetSetSize: state.totalPlayers,
-                      onClose: _closeStatsOverlay,
-                    ),
-                  ),
-                ),
+          // 4. Non-Intrusive Tutorial Modal Overlay for New Players
+          if (_showTutorialOverlay)
+            Positioned.fill(
+              child: TutorialModalOverlay(
+                targetSetSize: state.totalPlayers,
+                onClose: _closeTutorialOverlay,
+              ),
+            ),
 
-              // 4. Non-Intrusive Tutorial Modal Overlay for New Players
-              if (_showTutorialOverlay)
-                Positioned.fill(
-                  child: TutorialModalOverlay(
-                    targetSetSize: state.totalPlayers,
-                    onClose: _closeTutorialOverlay,
-                  ),
-                ),
-
-              // 5. Particle-Based Celebration Overlay (triggers strictly when a winning set completes)
-              if (_showCelebrationParticles && showVictoryModal)
-                Positioned.fill(
-                  child: CelebrationParticlesOverlay(
-                    completedType: _celebrationCountryType ?? state.winningType,
-                    burstOriginNormalized: _celebrationOriginNormalized,
-                    triggerKey: _celebrationTriggerKey,
-                  ),
-                ),
-            ],
-          );
-
-          if (isPortraitViewport) {
-            return RotatedBox(
-              quarterTurns: 1,
-              child: tableStack,
-            );
-          }
-
-          return tableStack;
-        },
+          // 5. Particle-Based Celebration Overlay (triggers strictly when a winning set completes)
+          if (_showCelebrationParticles && showVictoryModal)
+            Positioned.fill(
+              child: CelebrationParticlesOverlay(
+                completedType: _celebrationCountryType ?? state.winningType,
+                burstOriginNormalized: _celebrationOriginNormalized,
+                triggerKey: _celebrationTriggerKey,
+              ),
+            ),
+        ],
       ),
     );
   }

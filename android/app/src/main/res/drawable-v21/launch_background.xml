@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="?android:colorBackground" />
+    <!-- Solid dark emerald canvas matching the game table background -->
+    <item android:drawable="@color/splash_bg_color" />
 
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
+    <!-- Centered gold card emblem that preserves aspect ratio in landscape -->
+    <item
+        android:width="120dp"
+        android:height="120dp"
+        android:drawable="@drawable/splash_emblem"
+        android:gravity="center" />
 </layer-list>

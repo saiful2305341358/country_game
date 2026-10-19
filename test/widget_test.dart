@@ -6,6 +6,7 @@ import 'package:country_game/screens/player_selection_screen.dart';
 import 'package:country_game/widgets/card_dimensions.dart';
 import 'package:country_game/models/card_type.dart';
 import 'package:country_game/widgets/celebration_particles_overlay.dart';
+import 'package:country_game/widgets/country_card_view.dart';
 import 'package:country_game/widgets/player_stats_overlay.dart';
 import 'package:country_game/widgets/player_seat.dart';
 import 'package:country_game/widgets/tutorial_modal_overlay.dart';
@@ -75,6 +76,107 @@ void main() {
     expect(find.text('5 Players'), findsOneWidget);
     expect(find.text('6 Players'), findsOneWidget);
     expect(find.text('START GAME'), findsOneWidget);
+  });
+
+  testWidgets('PlayerSelectionScreen keeps anchored positions, card dimensions, and START GAME button stationary across 4, 5, and 6 players', (WidgetTester tester) async {
+    // Test across representative mobile landscape viewports (small 568x320, compact 640x360, tall-aspect 844x390, and wide 915x412)
+    for (final viewport in const [
+      Size(568, 320),
+      Size(640, 360),
+      Size(844, 390),
+      Size(915, 412),
+    ]) {
+      await tester.binding.setSurfaceSize(viewport);
+      await tester.pumpWidget(
+        CountryGameApp(key: UniqueKey(), showIntroOnStart: false),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('PLAY GAME'));
+      await tester.pumpAndSettle();
+
+      // Measure anchored positions in 4-player mode
+      final titleRect4 = tester.getRect(find.text('Select Players'));
+      final startBtnRect4 = tester.getRect(find.text('START GAME'));
+      final cards4 = tester.widgetList<CountryCardView>(find.byType(CountryCardView)).toList();
+      expect(cards4.length, equals(4));
+      final cardWidth4 = cards4.first.width;
+      final cardHeight4 = cards4.first.height;
+      // Verify all 4 cards are in a single horizontal row (identical top Y coordinate)
+      final firstCardTop4 = tester.getTopLeft(find.byType(CountryCardView).first).dy;
+      for (int i = 0; i < 4; i++) {
+        expect(
+          tester.getTopLeft(find.byType(CountryCardView).at(i)).dy,
+          closeTo(firstCardTop4, 0.1),
+        );
+      }
+
+      // Switch to 5-player mode
+      await tester.tap(find.text('5 Players'));
+      await tester.pumpAndSettle();
+
+      final titleRect5 = tester.getRect(find.text('Select Players'));
+      final startBtnRect5 = tester.getRect(find.text('START GAME'));
+      final cards5 = tester.widgetList<CountryCardView>(find.byType(CountryCardView)).toList();
+      expect(cards5.length, equals(5));
+
+      // Verify zero vertical or horizontal layout shift of title and Start Game button
+      expect(titleRect5.top, closeTo(titleRect4.top, 0.1));
+      expect(startBtnRect5.top, closeTo(startBtnRect4.top, 0.1));
+      expect(startBtnRect5.bottom, closeTo(startBtnRect4.bottom, 0.1));
+      // Verify card proportions remain identical and all 5 cards stay on the exact same horizontal row
+      expect(cards5.first.width, closeTo(cardWidth4, 0.01));
+      expect(cards5.first.height, closeTo(cardHeight4!, 0.01));
+      for (int i = 0; i < 5; i++) {
+        expect(
+          tester.getTopLeft(find.byType(CountryCardView).at(i)).dy,
+          closeTo(firstCardTop4, 0.1),
+        );
+      }
+
+      // Switch to 6-player mode
+      await tester.tap(find.text('6 Players'));
+      await tester.pumpAndSettle();
+
+      final titleRect6 = tester.getRect(find.text('Select Players'));
+      final startBtnRect6 = tester.getRect(find.text('START GAME'));
+      final cards6 = tester.widgetList<CountryCardView>(find.byType(CountryCardView)).toList();
+      expect(cards6.length, equals(6));
+
+      expect(titleRect6.top, closeTo(titleRect4.top, 0.1));
+      expect(startBtnRect6.top, closeTo(startBtnRect4.top, 0.1));
+      expect(startBtnRect6.bottom, closeTo(startBtnRect4.bottom, 0.1));
+      expect(cards6.first.width, closeTo(cardWidth4, 0.01));
+      expect(cards6.first.height, closeTo(cardHeight4, 0.01));
+      for (int i = 0; i < 6; i++) {
+        expect(
+          tester.getTopLeft(find.byType(CountryCardView).at(i)).dy,
+          closeTo(firstCardTop4, 0.1),
+        );
+      }
+    }
+
+    await tester.binding.setSurfaceSize(null);
+  });
+
+  testWidgets('Portrait host viewport is automatically normalized to landscape across all screens and dialogs without switching back to portrait', (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    await tester.pumpWidget(
+      CountryGameApp(key: UniqueKey(), showIntroOnStart: false),
+    );
+    await tester.pumpAndSettle();
+
+    // Main Menu is rendered in landscape via LandscapeViewportWrapper
+    expect(find.byType(RotatedBox), findsWidgets);
+    expect(find.text('PLAY GAME'), findsOneWidget);
+
+    // Navigate to Player Selection Screen and verify it remains in landscape
+    await tester.tap(find.text('PLAY GAME'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PlayerSelectionScreen), findsOneWidget);
+    expect(find.text('START GAME'), findsOneWidget);
+
+    await tester.binding.setSurfaceSize(null);
   });
 
   testWidgets('Navigation from MainMenu to Settings screen works and displays Haptic Feedback toggle', (WidgetTester tester) async {

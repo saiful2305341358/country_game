@@ -1,11 +1,11 @@
 {
-    "name": "country_game",
-    "short_name": "country_game",
+    "name": "Country Card Game",
+    "short_name": "Country Game",
     "start_url": ".",
-    "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "Country Card Game",
+    "display": "fullscreen",
+    "background_color": "#04140E",
+    "theme_color": "#04140E",
+    "description": "Offline Four-of-a-Kind Strategic Country Card Game.",
     "orientation": "landscape",
     "prefer_related_applications": false,
     "icons": [

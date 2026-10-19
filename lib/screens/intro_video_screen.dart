@@ -117,116 +117,101 @@ class _IntroVideoScreenState extends State<IntroVideoScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF061A12),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isPortraitViewport =
-              constraints.maxWidth < constraints.maxHeight;
-
-          final content = GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: _finishIntro,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // 1. Lightweight grass field background
-                const Positioned.fill(
-                  child: RepaintBoundary(
-                    child: CustomPaint(
-                      painter: StageLawnBackgroundPainter(),
-                      isComplex: true,
-                      willChange: false,
-                    ),
-                  ),
+      backgroundColor: const Color(0xFF04140E),
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _finishIntro,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // 1. Lightweight grass field background
+            const Positioned.fill(
+              child: RepaintBoundary(
+                child: CustomPaint(
+                  painter: StageLawnBackgroundPainter(),
+                  isComplex: true,
+                  willChange: false,
                 ),
-
-                // 2. Soft cinematic vignette overlay for contrast
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: RadialGradient(
-                        center: Alignment.center,
-                        radius: 0.95,
-                        colors: [
-                          Colors.black.withValues(alpha: 0.10),
-                          Colors.black.withValues(alpha: 0.58),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                // 3. Choreographed 800x450 widescreen stage scaled via FittedBox
-                Center(
-                  child: FittedBox(
-                    fit: BoxFit.contain,
-                    child: SizedBox(
-                      width: 800,
-                      height: 450,
-                      child: AnimatedBuilder(
-                        animation: _controller,
-                        builder: (context, _) {
-                          return _buildChoreographedStage(_controller.value);
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-
-                // 4. Top-Right Skip Intro button
-                SafeArea(
-                  child: Align(
-                    alignment: Alignment.topRight,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 12, right: 16),
-                      child: TextButton.icon(
-                        onPressed: _finishIntro,
-                        icon: const Icon(
-                          Icons.skip_next_rounded,
-                          color: Color(0xFFFFE082),
-                          size: 18,
-                        ),
-                        label: const Text(
-                          'SKIP INTRO',
-                          style: TextStyle(
-                            color: Color(0xFFFFE082),
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.1,
-                          ),
-                        ),
-                        style: TextButton.styleFrom(
-                          backgroundColor:
-                              const Color(0xFF0F172A).withValues(alpha: 0.78),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            side: BorderSide(
-                              color: const Color(0xFFFFD54F)
-                                  .withValues(alpha: 0.5),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          );
 
-          if (isPortraitViewport) {
-            return RotatedBox(
-              quarterTurns: 1,
-              child: content,
-            );
-          }
+            // 2. Soft cinematic vignette overlay for contrast
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment.center,
+                    radius: 0.95,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.10),
+                      Colors.black.withValues(alpha: 0.58),
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
-          return content;
-        },
+            // 3. Choreographed 800x450 widescreen stage scaled via FittedBox
+            SafeArea(
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.contain,
+                  child: SizedBox(
+                    width: 800,
+                    height: 450,
+                    child: AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, _) {
+                        return _buildChoreographedStage(_controller.value);
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // 4. Top-Right Skip Intro button
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 12, right: 16),
+                  child: TextButton.icon(
+                    onPressed: _finishIntro,
+                    icon: const Icon(
+                      Icons.skip_next_rounded,
+                      color: Color(0xFFFFE082),
+                      size: 18,
+                    ),
+                    label: const Text(
+                      'SKIP INTRO',
+                      style: TextStyle(
+                        color: Color(0xFFFFE082),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      backgroundColor:
+                          const Color(0xFF0F172A).withValues(alpha: 0.78),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: BorderSide(
+                          color: const Color(0xFFFFD54F).withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

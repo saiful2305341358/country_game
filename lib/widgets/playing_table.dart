@@ -404,15 +404,16 @@ class _PlayingTableState extends State<PlayingTable>
             ),
           ),
 
-          // Horizontal 1920x1080 stage scaled cleanly via FittedBox (matching fit() in HTML)
-          Center(
-            child: FittedBox(
-              fit: BoxFit.contain,
-              alignment: Alignment.center,
-              child: SizedBox(
-                width: _stageWidth,
-                height: _stageHeight,
-                child: Stack(
+          // Horizontal 1920x1080 stage scaled cleanly via FittedBox inside SafeArea
+          SafeArea(
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.contain,
+                alignment: Alignment.center,
+                child: SizedBox(
+                  width: _stageWidth,
+                  height: _stageHeight,
+                  child: Stack(
                   clipBehavior: Clip.none,
                   children: [
                     // 1. Top-Left Back/Menu Button (.btn at left: 90px, top: 60px)
@@ -548,10 +549,11 @@ class _PlayingTableState extends State<PlayingTable>
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildCircleButton({
     required String tooltip,

@@ -57,27 +57,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFFFFD54F)),
-          onPressed: () {
-            HapticService.instance.uiTap();
-            Navigator.pop(context);
-          },
-        ),
-        title: const Text(
-          'Settings',
-          style: TextStyle(
-            color: Color(0xFFFFD700),
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      extendBodyBehindAppBar: true,
+      backgroundColor: const Color(0xFF04140E),
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -93,203 +73,303 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
-                child: Column(
-                  children: [
-                    // Audio & Haptics Card
-                    _buildSettingsCard(
-                      title: 'Audio & Haptics',
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final availW = constraints.maxWidth;
+              final availH = constraints.maxHeight;
+              final isCompactH = availH < 390;
+
+              return Center(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: availW < 640 ? 16 : 24,
+                    vertical: isCompactH ? 8 : 14,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 820),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Material(
-                          color: Colors.transparent,
-                          child: SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text(
-                              'Gameplay Sound Effects',
-                              style: TextStyle(color: Colors.white, fontSize: 13),
-                            ),
-                            subtitle: const Text(
-                              'Soft wooden taps, subtle card slides, and victory chimes during matches',
-                              style: TextStyle(
-                                color: Colors.white60,
-                                fontSize: 10.5,
+                        // 1. Anchored Top Header Row
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: 40,
+                              height: 40,
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                tooltip: 'Back',
+                                icon: const Icon(
+                                  Icons.arrow_back,
+                                  color: Color(0xFFFFD54F),
+                                ),
+                                onPressed: () {
+                                  HapticService.instance.uiTap();
+                                  Navigator.pop(context);
+                                },
                               ),
                             ),
-                            secondary: Icon(
-                              _soundEnabled
-                                  ? Icons.volume_up_rounded
-                                  : Icons.volume_off_rounded,
-                              color: const Color(0xFFFFD54F),
+                            const Expanded(
+                              child: Text(
+                                'Settings',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Color(0xFFFFD700),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1,
+                                ),
+                              ),
                             ),
-                            value: _soundEnabled,
-                            activeTrackColor: const Color(0xFFFFD54F),
-                            onChanged: (val) {
-                              setState(() {
-                                _soundEnabled = val;
-                                AudioService.instance.isSoundEnabled = val;
-                                _syncSettings();
-                              });
-                              HapticService.instance.uiTap();
-                              if (val) {
-                                // Audible confirmation feedback when testing switch
-                                AudioService.instance.playCardTap();
-                              }
-                            },
-                          ),
+                            const SizedBox(width: 40),
+                          ],
                         ),
-                        const Divider(color: Colors.white12),
-                        Material(
-                          color: Colors.transparent,
-                          child: SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text(
-                              'Tactile Haptic Feedback',
-                              style: TextStyle(color: Colors.white, fontSize: 13),
-                            ),
-                            subtitle: const Text(
-                              'Physical vibration responses for card taps, turn alerts, and victory events',
-                              style: TextStyle(
-                                color: Colors.white60,
-                                fontSize: 10.5,
+
+                        SizedBox(height: isCompactH ? 8 : 14),
+
+                        // 2. Balanced Two-Column Landscape Cards Row
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                              // Left Card: Audio & Haptics
+                              Expanded(
+                                child: _buildSettingsCard(
+                                  title: 'Audio & Haptics',
+                                  isCompactH: isCompactH,
+                                  children: [
+                                    Material(
+                                      color: Colors.transparent,
+                                      child: SwitchListTile(
+                                        dense: isCompactH,
+                                        visualDensity: isCompactH
+                                            ? VisualDensity.compact
+                                            : VisualDensity.standard,
+                                        contentPadding: EdgeInsets.zero,
+                                        title: const Text(
+                                          'Gameplay Sound Effects',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        subtitle: const Text(
+                                          'Soft wooden taps, subtle card slides, and victory chimes during matches',
+                                          style: TextStyle(
+                                            color: Colors.white60,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                        secondary: Icon(
+                                          _soundEnabled
+                                              ? Icons.volume_up_rounded
+                                              : Icons.volume_off_rounded,
+                                          color: const Color(0xFFFFD54F),
+                                          size: 21,
+                                        ),
+                                        value: _soundEnabled,
+                                        activeTrackColor:
+                                            const Color(0xFFFFD54F),
+                                        onChanged: (val) {
+                                          setState(() {
+                                            _soundEnabled = val;
+                                            AudioService.instance
+                                                .isSoundEnabled = val;
+                                            _syncSettings();
+                                          });
+                                          HapticService.instance.uiTap();
+                                          if (val) {
+                                            AudioService.instance.playCardTap();
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                    const Divider(
+                                      color: Colors.white12,
+                                      height: 12,
+                                    ),
+                                    Material(
+                                      color: Colors.transparent,
+                                      child: SwitchListTile(
+                                        dense: isCompactH,
+                                        visualDensity: isCompactH
+                                            ? VisualDensity.compact
+                                            : VisualDensity.standard,
+                                        contentPadding: EdgeInsets.zero,
+                                        title: const Text(
+                                          'Tactile Haptic Feedback',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        subtitle: const Text(
+                                          'Physical vibration responses for card taps, turn alerts, and victory events',
+                                          style: TextStyle(
+                                            color: Colors.white60,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                        secondary: Icon(
+                                          _hapticsEnabled
+                                              ? Icons.vibration_rounded
+                                              : Icons.phonelink_erase_rounded,
+                                          color: const Color(0xFFFFD54F),
+                                          size: 21,
+                                        ),
+                                        value: _hapticsEnabled,
+                                        activeTrackColor:
+                                            const Color(0xFFFFD54F),
+                                        onChanged: (val) {
+                                          setState(() {
+                                            _hapticsEnabled = val;
+                                            HapticService.instance
+                                                .isHapticsEnabled = val;
+                                            _syncSettings();
+                                          });
+                                          if (val) {
+                                            HapticService.instance.cardPass();
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(width: 14),
+
+                              // Right Card: Display & Gameplay
+                              Expanded(
+                                child: _buildSettingsCard(
+                                  title: 'Display & Gameplay',
+                                  isCompactH: isCompactH,
+                                  children: [
+                                    Material(
+                                      color: Colors.transparent,
+                                      child: SwitchListTile(
+                                        dense: isCompactH,
+                                        visualDensity: isCompactH
+                                            ? VisualDensity.compact
+                                            : VisualDensity.standard,
+                                        contentPadding: EdgeInsets.zero,
+                                        title: const Text(
+                                          'Smooth Animations',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        subtitle: const Text(
+                                          'Initial card dealing animation and 2D card passing trajectories',
+                                          style: TextStyle(
+                                            color: Colors.white60,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                        secondary: const Icon(
+                                          Icons.animation,
+                                          color: Color(0xFFFFD54F),
+                                          size: 21,
+                                        ),
+                                        value: _animationsEnabled,
+                                        activeTrackColor:
+                                            const Color(0xFFFFD54F),
+                                        onChanged: (val) {
+                                          setState(() {
+                                            _animationsEnabled = val;
+                                            _syncSettings();
+                                          });
+                                          HapticService.instance.uiTap();
+                                        },
+                                      ),
+                                    ),
+                                    const Divider(
+                                      color: Colors.white12,
+                                      height: 12,
+                                    ),
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.speed,
+                                          color: Color(0xFFFFD54F),
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              const Text(
+                                                'Bot Thinking Pace',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 12.5,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                              Text(
+                                                _botDelayMs <= 1100
+                                                    ? 'Fast (1100ms)'
+                                                    : _botDelayMs <= 1650
+                                                        ? 'Normal (1650ms)'
+                                                        : 'Relaxed (2300ms)',
+                                                style: const TextStyle(
+                                                  color: Color(0xFFFFD54F),
+                                                  fontSize: 10.5,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        _buildPaceButton('Fast', 1100),
+                                        const SizedBox(width: 8),
+                                        _buildPaceButton('Normal', 1650),
+                                        const SizedBox(width: 8),
+                                        _buildPaceButton('Relaxed', 2300),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+
+                        SizedBox(height: isCompactH ? 10 : 14),
+
+                        // 3. Reset Defaults Button
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.restore, size: 18),
+                            label: const Text('Reset All Settings to Default'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white70,
+                              side: const BorderSide(color: Colors.white24),
+                              padding: EdgeInsets.symmetric(
+                                vertical: isCompactH ? 9 : 11,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
                               ),
                             ),
-                            secondary: Icon(
-                              _hapticsEnabled
-                                  ? Icons.vibration_rounded
-                                  : Icons.phonelink_erase_rounded,
-                              color: const Color(0xFFFFD54F),
-                            ),
-                            value: _hapticsEnabled,
-                            activeTrackColor: const Color(0xFFFFD54F),
-                            onChanged: (val) {
-                              setState(() {
-                                _hapticsEnabled = val;
-                                HapticService.instance.isHapticsEnabled = val;
-                                _syncSettings();
-                              });
-                              if (val) {
-                                // Tactile confirmation pulse when enabling haptics
-                                HapticService.instance.cardPass();
-                              }
-                            },
+                            onPressed: _resetToDefaults,
                           ),
                         ),
                       ],
                     ),
-
-                    const SizedBox(height: 16),
-
-                    // Visuals & Animations
-                    _buildSettingsCard(
-                      title: 'Display & Gameplay',
-                      children: [
-                        Material(
-                          color: Colors.transparent,
-                          child: SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text(
-                              'Smooth Animations',
-                              style: TextStyle(color: Colors.white, fontSize: 13),
-                            ),
-                            subtitle: const Text(
-                              'Initial card dealing animation and 2D card passing trajectories',
-                              style: TextStyle(
-                                color: Colors.white60,
-                                fontSize: 10.5,
-                              ),
-                            ),
-                            secondary: const Icon(
-                              Icons.animation,
-                              color: Color(0xFFFFD54F),
-                            ),
-                            value: _animationsEnabled,
-                            activeTrackColor: const Color(0xFFFFD54F),
-                            onChanged: (val) {
-                              setState(() {
-                                _animationsEnabled = val;
-                                _syncSettings();
-                              });
-                              HapticService.instance.uiTap();
-                            },
-                          ),
-                        ),
-                        const Divider(color: Colors.white12),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.speed,
-                              color: Color(0xFFFFD54F),
-                              size: 22,
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Bot Thinking Pace',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  Text(
-                                    _botDelayMs <= 1100
-                                        ? 'Fast (1100ms)'
-                                        : _botDelayMs <= 1650
-                                            ? 'Normal (1650ms)'
-                                            : 'Relaxed (2300ms)',
-                                    style: const TextStyle(
-                                      color: Color(0xFFFFD54F),
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            _buildPaceButton('Fast', 1100),
-                            const SizedBox(width: 8),
-                            _buildPaceButton('Normal', 1650),
-                            const SizedBox(width: 8),
-                            _buildPaceButton('Relaxed', 2300),
-                          ],
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Reset Defaults
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.restore, size: 18),
-                        label: const Text('Reset All Settings to Default'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white70,
-                          side: const BorderSide(color: Colors.white24),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        onPressed: _resetToDefaults,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),
@@ -308,7 +388,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           });
         },
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 7),
           decoration: BoxDecoration(
             color: isSelected
                 ? const Color(0xFFD97706)
@@ -334,6 +414,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildSettingsCard({
     required String title,
+    required bool isCompactH,
     required List<Widget> children,
   }) {
     return Material(
@@ -345,7 +426,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(isCompactH ? 12 : 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -358,7 +439,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 letterSpacing: 1.5,
               ),
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: isCompactH ? 6 : 8),
             ...children,
           ],
         ),

@@ -1,14 +1,21 @@
 package com.example.country_game
 
 import android.content.Context
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
 import android.os.Build
+import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.view.View
+import android.view.WindowInsets
+import android.view.WindowInsetsController
+import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -49,6 +56,76 @@ class MainActivity : FlutterActivity() {
             }
         } catch (_: Throwable) {
             null
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        // Apply sensorLandscape lock and shortEdges cutout mode before super.onCreate
+        // so the native launch splash window initializes immediately in fullscreen landscape.
+        enforceLandscapeAndImmersiveWindow()
+        super.onCreate(savedInstanceState)
+        enforceLandscapeAndImmersiveWindow()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        enforceLandscapeAndImmersiveWindow()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        enforceLandscapeAndImmersiveWindow()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            enforceLandscapeAndImmersiveWindow()
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun enforceLandscapeAndImmersiveWindow() {
+        try {
+            if (requestedOrientation != ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE) {
+                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            }
+
+            val currentWindow = window ?: return
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val params = currentWindow.attributes
+                if (params.layoutInDisplayCutoutMode !=
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                ) {
+                    params.layoutInDisplayCutoutMode =
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    currentWindow.attributes = params
+                }
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                currentWindow.setDecorFitsSystemWindows(false)
+                currentWindow.insetsController?.let { controller ->
+                    controller.hide(
+                        WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars()
+                    )
+                    controller.systemBarsBehavior =
+                        WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                }
+            } else {
+                currentWindow.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
+                currentWindow.decorView.systemUiVisibility = (
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                        or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        or View.SYSTEM_UI_FLAG_FULLSCREEN
+                )
+            }
+        } catch (_: Throwable) {
+            // Ignore on restricted OEM window managers
         }
     }
 
@@ -125,28 +202,47 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun playPcmNonBlocking(pcmBytes: ByteArray) {
-        if (audioScheduler.isShutdown) return
         audioScheduler.execute {
             var track: AudioTrack? = null
             try {
-                track = AudioTrack(
-                    gameAudioAttributes,
-                    monoPcmFormat,
+                val bufferSize = maxOf(
                     pcmBytes.size,
-                    AudioTrack.MODE_STATIC,
-                    AudioManager.AUDIO_SESSION_ID_GENERATE
+                    AudioTrack.getMinBufferSize(
+                        sampleRate,
+                        AudioFormat.CHANNEL_OUT_MONO,
+                        AudioFormat.ENCODING_PCM_16BIT
+                    )
                 )
+                track = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    AudioTrack.Builder()
+                        .setAudioAttributes(gameAudioAttributes)
+                        .setAudioFormat(monoPcmFormat)
+                        .setBufferSizeInBytes(bufferSize)
+                        .setTransferMode(AudioTrack.MODE_STATIC)
+                        .build()
+                } else {
+                    @Suppress("DEPRECATION")
+                    AudioTrack(
+                        AudioManager.STREAM_MUSIC,
+                        sampleRate,
+                        AudioFormat.CHANNEL_OUT_MONO,
+                        AudioFormat.ENCODING_PCM_16BIT,
+                        bufferSize,
+                        AudioTrack.MODE_STATIC
+                    )
+                }
+
                 track.write(pcmBytes, 0, pcmBytes.size)
                 track.play()
 
-                val durationMs = (pcmBytes.size * 1000L) / (sampleRate * 2) + 60L
-                val createdTrack = track
+                val durationMs = ((pcmBytes.size.toLong() * 1000L) / (sampleRate * 2L)) + 80L
+                val trackToRelease = track
                 audioScheduler.schedule({
                     try {
-                        createdTrack.stop()
+                        trackToRelease.stop()
                     } catch (_: Throwable) {}
                     try {
-                        createdTrack.release()
+                        trackToRelease.release()
                     } catch (_: Throwable) {}
                 }, durationMs, TimeUnit.MILLISECONDS)
             } catch (_: Throwable) {
@@ -159,31 +255,29 @@ class MainActivity : FlutterActivity() {
 
     @Suppress("DEPRECATION")
     private fun triggerVibration(patternList: List<Int>, amplitude: Int) {
+        val vib = hardwareVibrator ?: return
         try {
-            val vibrator = hardwareVibrator
-            if (vibrator == null || !vibrator.hasVibrator()) return
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (patternList.size <= 1) {
-                    val ms = (patternList.firstOrNull() ?: 18).toLong().coerceAtLeast(8L)
-                    vibrator.vibrate(VibrationEffect.createOneShot(ms, amplitude))
+            if (!vib.hasVibrator()) return
+            if (patternList.size <= 1) {
+                val duration = (patternList.firstOrNull() ?: 18).toLong().coerceAtLeast(10L)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vib.vibrate(VibrationEffect.createOneShot(duration, amplitude))
                 } else {
-                    val timings = LongArray(patternList.size + 1)
-                    val amplitudes = IntArray(patternList.size + 1)
-                    timings[0] = 0L
-                    amplitudes[0] = 0
-                    for (i in patternList.indices) {
-                        timings[i + 1] = patternList[i].toLong().coerceAtLeast(8L)
-                        amplitudes[i + 1] = if (i % 2 == 0) amplitude else 0
-                    }
-                    vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+                    vib.vibrate(duration)
                 }
             } else {
-                val ms = (patternList.firstOrNull() ?: 20).toLong()
-                vibrator.vibrate(ms)
+                val timings = LongArray(patternList.size + 1)
+                timings[0] = 0L
+                for (i in patternList.indices) {
+                    timings[i + 1] = patternList[i].toLong().coerceAtLeast(10L)
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vib.vibrate(VibrationEffect.createWaveform(timings, -1))
+                } else {
+                    vib.vibrate(timings, -1)
+                }
             }
-        } catch (_: Throwable) {
-        }
+        } catch (_: Throwable) {}
     }
 
     override fun onDestroy() {
