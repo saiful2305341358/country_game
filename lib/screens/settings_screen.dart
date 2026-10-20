@@ -104,6 +104,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   color: Color(0xFFFFD54F),
                                 ),
                                 onPressed: () {
+                                  AudioService.instance.playButtonClick();
                                   HapticService.instance.uiTap();
                                   Navigator.pop(context);
                                 },
@@ -282,6 +283,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                             _animationsEnabled = val;
                                             _syncSettings();
                                           });
+                                          AudioService.instance.playButtonClick();
                                           HapticService.instance.uiTap();
                                         },
                                       ),
@@ -381,6 +383,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Expanded(
       child: GestureDetector(
         onTap: () {
+          AudioService.instance.playButtonClick();
           HapticService.instance.uiTap();
           setState(() {
             _botDelayMs = ms;

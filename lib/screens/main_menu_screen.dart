@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../services/audio_service.dart';
+import '../services/haptic_service.dart';
 import '../widgets/game_logo.dart';
 import '../widgets/player_stats_overlay.dart';
 import 'player_selection_screen.dart';
@@ -145,6 +147,8 @@ class MainMenuScreen extends StatelessWidget {
                                       .withValues(alpha: 0.5),
                                 ),
                                 onPressed: () {
+                                  AudioService.instance.playButtonClick();
+                                  HapticService.instance.uiTap();
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -181,7 +185,11 @@ class MainMenuScreen extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
-                                onPressed: () => _showRulesDialog(context),
+                                onPressed: () {
+                                  AudioService.instance.playButtonClick();
+                                  HapticService.instance.uiTap();
+                                  _showRulesDialog(context);
+                                },
                               ),
 
                               SizedBox(height: isCompactH ? 10 : 12),
@@ -211,6 +219,8 @@ class MainMenuScreen extends StatelessWidget {
                                   ),
                                 ),
                                 onPressed: () {
+                                  AudioService.instance.playButtonClick();
+                                  HapticService.instance.uiTap();
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -244,6 +254,8 @@ class MainMenuScreen extends StatelessWidget {
                                   ),
                                 ),
                                 onPressed: () {
+                                  AudioService.instance.playButtonClick();
+                                  HapticService.instance.uiTap();
                                   showDialog(
                                     context: context,
                                     builder: (dialogContext) => Dialog(

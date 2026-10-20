@@ -6,8 +6,9 @@ import 'stats_storage_stub.dart';
 AudioServiceInterface createAudioService() => AudioServiceMobile();
 
 /// Native Mobile (Android APK/AAB & iOS IPA) Audio Service.
-/// Generates 16-bit 22050Hz PCM WAV buffers once via [SoundSynthesizer], transmits each
-/// buffer at most once to the native layer, and triggers subsequent playback by key only.
+/// Generates 16-bit 22050Hz PCM WAV buffers once via [SoundSynthesizer], preloads all
+/// buffers into native Android SoundPool / AudioTrack cache and iOS AVAudioPlayer cache,
+/// and supports immediate stopAll when muted.
 class AudioServiceMobile implements AudioServiceInterface {
   static const MethodChannel _channel = MethodChannel(
     'com.example.country_game/native_feedback',
@@ -21,6 +22,7 @@ class AudioServiceMobile implements AudioServiceInterface {
   AudioServiceMobile() {
     _loadSavedPreference();
     _wavBuffers = SoundSynthesizer.generateAllWavBytes();
+    _preloadAllToNative();
   }
 
   void _loadSavedPreference() {
@@ -30,6 +32,19 @@ class AudioServiceMobile implements AudioServiceInterface {
     }
   }
 
+  void _preloadAllToNative() {
+    try {
+      _channel
+          .invokeMethod<void>('preloadAll', <String, dynamic>{
+            'sounds': _wavBuffers,
+          })
+          .then((_) {
+            _syncedKeys.addAll(_wavBuffers.keys);
+          })
+          .catchError((_) {});
+    } catch (_) {}
+  }
+
   @override
   bool get isSoundEnabled => _soundEnabled;
 
@@ -37,6 +52,11 @@ class AudioServiceMobile implements AudioServiceInterface {
   set isSoundEnabled(bool enabled) {
     _soundEnabled = enabled;
     StatsStorage.write(_prefKey, enabled.toString());
+    if (!enabled) {
+      try {
+        _channel.invokeMethod<void>('stopAll').catchError((_) {});
+      } catch (_) {}
+    }
   }
 
   void _playNativeWav(String key) {
@@ -44,8 +64,6 @@ class AudioServiceMobile implements AudioServiceInterface {
     final bytes = _wavBuffers[key];
     if (bytes == null) return;
 
-    // Only transmit the WAV byte payload the first time each sound key is played;
-    // native Android (pcmCache) and iOS (wavCache) retain the buffer in memory.
     final bool sendBytes = _syncedKeys.add(key);
 
     try {
@@ -87,5 +105,9 @@ class AudioServiceMobile implements AudioServiceInterface {
   void playButtonClick() => _playNativeWav('buttonClick');
 
   @override
-  void dispose() {}
+  void dispose() {
+    try {
+      _channel.invokeMethod<void>('stopAll').catchError((_) {});
+    } catch (_) {}
+  }
 }

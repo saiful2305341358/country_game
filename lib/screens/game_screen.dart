@@ -193,6 +193,16 @@ class _GameScreenState extends State<GameScreen>
         Offset(1519 / 1920, 762 / 1080),
       ];
       return seats[opponentIdx % seats.length];
+    } else if (totalPlayers == 7) {
+      const seats = [
+        Offset(340 / 1920, 760 / 1080),
+        Offset(430 / 1920, 430 / 1080),
+        Offset(730 / 1920, 155 / 1080),
+        Offset(1190 / 1920, 155 / 1080),
+        Offset(1490 / 1920, 430 / 1080),
+        Offset(1580 / 1920, 760 / 1080),
+      ];
+      return seats[opponentIdx % seats.length];
     } else {
       const seats = [
         Offset(401 / 1920, 762 / 1080),

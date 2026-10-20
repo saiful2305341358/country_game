@@ -9,6 +9,27 @@ import { loadPersistedSettings, savePersistedSettings } from './services/soundSy
 
 type ScreenRoute = 'intro' | 'menu' | 'playerSelection' | 'settings' | 'game';
 
+const SESSION_INTRO_KEY = 'ccg_intro_played_session';
+let hasPlayedIntroInMemory = false;
+
+export function hasPlayedIntroThisSession(): boolean {
+  if (hasPlayedIntroInMemory) return true;
+  try {
+    return window.sessionStorage.getItem(SESSION_INTRO_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function markIntroPlayedThisSession(): void {
+  hasPlayedIntroInMemory = true;
+  try {
+    window.sessionStorage.setItem(SESSION_INTRO_KEY, '1');
+  } catch {
+    // ignore in restricted storage contexts
+  }
+}
+
 export const LandscapeViewportWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [viewport, setViewport] = useState(() => ({
     width: window.innerWidth,
@@ -33,19 +54,24 @@ export const LandscapeViewportWrapper: React.FC<{ children: React.ReactNode }> =
 
   const isPortrait = viewport.width > 0 && viewport.height > 0 && viewport.width < viewport.height;
 
-  if (!isPortrait) {
-    return <div className="w-full h-full overflow-hidden">{children}</div>;
-  }
-
+  // Keep a single consistent DOM tree structure across portrait and landscape
+  // so React never unmounts or restarts active screens on mobile orientation changes.
   return (
     <div className="w-full h-full overflow-hidden flex items-center justify-center bg-[#04140E]">
       <div
-        style={{
-          width: `${viewport.height}px`,
-          height: `${viewport.width}px`,
-          transform: 'rotate(90deg)',
-          transformOrigin: 'center center',
-        }}
+        style={
+          isPortrait
+            ? {
+                width: `${viewport.height}px`,
+                height: `${viewport.width}px`,
+                transform: 'rotate(90deg)',
+                transformOrigin: 'center center',
+              }
+            : {
+                width: '100%',
+                height: '100%',
+              }
+        }
         className="relative shrink-0 overflow-hidden"
       >
         {children}
@@ -55,7 +81,9 @@ export const LandscapeViewportWrapper: React.FC<{ children: React.ReactNode }> =
 };
 
 export function App() {
-  const [route, setRoute] = useState<ScreenRoute>('intro');
+  const [route, setRoute] = useState<ScreenRoute>(() =>
+    hasPlayedIntroThisSession() ? 'menu' : 'intro'
+  );
   const [settings, setSettings] = useState<GameSettings>(() => loadPersistedSettings());
   const [activeMatchConfig, setActiveMatchConfig] = useState<{
     totalPlayers: number;
@@ -68,6 +96,9 @@ export function App() {
   }, []);
 
   const navigateTo = useCallback((nextRoute: ScreenRoute) => {
+    if (nextRoute !== 'intro') {
+      markIntroPlayedThisSession();
+    }
     setRoute(nextRoute);
     try {
       window.history.pushState({ route: nextRoute }, '');
@@ -76,14 +107,18 @@ export function App() {
     }
   }, []);
 
-  // Intercept Android system Back / browser history Back so it follows in-game hierarchy
   useEffect(() => {
     try {
-      window.history.replaceState({ route: 'intro' }, '');
+      window.history.replaceState({ route }, '');
     } catch {
       // ignore
     }
+    // Only initialize history state once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // Intercept Android system Back / browser history Back so it follows in-game hierarchy
+  useEffect(() => {
     const onPopState = () => {
       if (route === 'game') {
         // Re-push history state and notify GameScreen to open ExitConfirmationDialog
@@ -95,9 +130,9 @@ export function App() {
         window.dispatchEvent(new CustomEvent('ccg-hardware-back'));
       } else if (route === 'playerSelection' || route === 'settings') {
         setRoute('menu');
-      } else if (route === 'menu') {
+      } else if (route === 'menu' || route === 'intro') {
         try {
-          window.history.pushState({ route: 'menu' }, '');
+          window.history.pushState({ route }, '');
         } catch {
           // ignore
         }
@@ -110,7 +145,14 @@ export function App() {
 
   return (
     <LandscapeViewportWrapper>
-      {route === 'intro' && <IntroVideoScreen onFinished={() => navigateTo('menu')} />}
+      {route === 'intro' && (
+        <IntroVideoScreen
+          onFinished={() => {
+            markIntroPlayedThisSession();
+            navigateTo('menu');
+          }}
+        />
+      )}
 
       {route === 'menu' && (
         <MainMenuScreen

@@ -7,6 +7,7 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
+import android.media.SoundPool
 import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
@@ -19,21 +20,34 @@ import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 class MainActivity : FlutterActivity() {
+    companion object {
+        @Volatile
+        private var sessionIntroPlayed: Boolean = false
+        private const val SESSION_INTRO_KEY = "__session_intro_played__"
+    }
+
     private val channelName = "com.example.country_game/native_feedback"
     private val prefsName = "country_game_prefs"
     private val sampleRate = 22050
     private val pcmCache = ConcurrentHashMap<String, ByteArray>()
-    private val audioScheduler = Executors.newScheduledThreadPool(2)
+    private val soundIdMap = ConcurrentHashMap<String, Int>()
+    private val loadedSoundIds = ConcurrentHashMap.newKeySet<Int>()
+    private val activeStreams = CopyOnWriteArrayList<Int>()
+    private val activeTracks = CopyOnWriteArrayList<AudioTrack>()
+    private val audioScheduler = Executors.newScheduledThreadPool(3)
 
     private val gameAudioAttributes: AudioAttributes by lazy {
         AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_GAME)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
             .build()
     }
 
@@ -43,6 +57,24 @@ class MainActivity : FlutterActivity() {
             .setSampleRate(sampleRate)
             .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
             .build()
+    }
+
+    private val soundPool: SoundPool? by lazy {
+        try {
+            SoundPool.Builder()
+                .setMaxStreams(8)
+                .setAudioAttributes(gameAudioAttributes)
+                .build()
+                .apply {
+                    setOnLoadCompleteListener { _, sampleId, status ->
+                        if (status == 0) {
+                            loadedSoundIds.add(sampleId)
+                        }
+                    }
+                }
+        } catch (_: Throwable) {
+            null
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -60,15 +92,15 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Apply sensorLandscape lock and shortEdges cutout mode before super.onCreate
-        // so the native launch splash window initializes immediately in fullscreen landscape.
         enforceLandscapeAndImmersiveWindow()
         super.onCreate(savedInstanceState)
+        volumeControlStream = AudioManager.STREAM_MUSIC
         enforceLandscapeAndImmersiveWindow()
     }
 
     override fun onResume() {
         super.onResume()
+        volumeControlStream = AudioManager.STREAM_MUSIC
         enforceLandscapeAndImmersiveWindow()
     }
 
@@ -136,19 +168,28 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "preloadAll" -> {
+                        val sounds = call.argument<Map<String, ByteArray>>("sounds")
+                        if (sounds != null) {
+                            audioScheduler.execute {
+                                for ((key, wavBytes) in sounds) {
+                                    cacheWavAndLoadSoundPool(key, wavBytes)
+                                }
+                            }
+                        }
+                        result.success(null)
+                    }
                     "playWav" -> {
                         val key = call.argument<String>("key") ?: "sfx"
                         val wavBytes = call.argument<ByteArray>("bytes")
-                        val pcmBytes = if (wavBytes != null && wavBytes.size > 44) {
-                            val extracted = wavBytes.copyOfRange(44, wavBytes.size)
-                            pcmCache[key] = extracted
-                            extracted
-                        } else {
-                            pcmCache[key]
+                        if (wavBytes != null && wavBytes.size > 44) {
+                            cacheWavAndLoadSoundPool(key, wavBytes)
                         }
-                        if (pcmBytes != null && pcmBytes.isNotEmpty()) {
-                            playPcmNonBlocking(pcmBytes)
-                        }
+                        playCachedSound(key)
+                        result.success(null)
+                    }
+                    "stopAll" -> {
+                        stopAllActiveAudio()
                         result.success(null)
                     }
                     "vibrate" -> {
@@ -166,33 +207,42 @@ class MainActivity : FlutterActivity() {
                                     out[k] = v
                                 }
                             }
+                            out[SESSION_INTRO_KEY] = if (sessionIntroPlayed) "1" else "0"
                             result.success(out)
                         } catch (_: Throwable) {
-                            result.success(emptyMap<String, String>())
+                            result.success(mapOf(SESSION_INTRO_KEY to if (sessionIntroPlayed) "1" else "0"))
                         }
                     }
                     "setPref" -> {
                         val key = call.argument<String>("key")
                         val value = call.argument<String>("value")
                         if (key != null && value != null) {
-                            try {
-                                getSharedPreferences(prefsName, Context.MODE_PRIVATE)
-                                    .edit()
-                                    .putString(key, value)
-                                    .apply()
-                            } catch (_: Throwable) {}
+                            if (key == SESSION_INTRO_KEY) {
+                                sessionIntroPlayed = (value == "1")
+                            } else {
+                                try {
+                                    getSharedPreferences(prefsName, Context.MODE_PRIVATE)
+                                        .edit()
+                                        .putString(key, value)
+                                        .apply()
+                                } catch (_: Throwable) {}
+                            }
                         }
                         result.success(null)
                     }
                     "removePref" -> {
                         val key = call.argument<String>("key")
                         if (key != null) {
-                            try {
-                                getSharedPreferences(prefsName, Context.MODE_PRIVATE)
-                                    .edit()
-                                    .remove(key)
-                                    .apply()
-                            } catch (_: Throwable) {}
+                            if (key == SESSION_INTRO_KEY) {
+                                sessionIntroPlayed = false
+                            } else {
+                                try {
+                                    getSharedPreferences(prefsName, Context.MODE_PRIVATE)
+                                        .edit()
+                                        .remove(key)
+                                        .apply()
+                                } catch (_: Throwable) {}
+                            }
                         }
                         result.success(null)
                     }
@@ -201,23 +251,83 @@ class MainActivity : FlutterActivity() {
             }
     }
 
+    private fun cacheWavAndLoadSoundPool(key: String, wavBytes: ByteArray) {
+        if (wavBytes.size <= 44) return
+        val extracted = wavBytes.copyOfRange(44, wavBytes.size)
+        pcmCache[key] = extracted
+
+        val pool = soundPool ?: return
+        if (soundIdMap.containsKey(key)) return
+
+        try {
+            val outFile = File(cacheDir, "ccg_sfx_${key}_v2.wav")
+            if (!outFile.exists() || outFile.length() != wavBytes.size.toLong()) {
+                FileOutputStream(outFile).use { fos ->
+                    fos.write(wavBytes)
+                    fos.flush()
+                }
+            }
+            val id = pool.load(outFile.absolutePath, 1)
+            if (id > 0) {
+                soundIdMap[key] = id
+            }
+        } catch (_: Throwable) {
+            // Fallback to AudioTrack via pcmCache
+        }
+    }
+
+    private fun playCachedSound(key: String) {
+        val pool = soundPool
+        val soundId = soundIdMap[key]
+        if (pool != null && soundId != null && loadedSoundIds.contains(soundId)) {
+            val streamId = pool.play(soundId, 1.0f, 1.0f, 1, 0, 1.0f)
+            if (streamId != 0) {
+                activeStreams.add(streamId)
+                if (activeStreams.size > 16) {
+                    activeStreams.removeAt(0)
+                }
+                return
+            }
+        }
+
+        val pcmBytes = pcmCache[key]
+        if (pcmBytes != null && pcmBytes.isNotEmpty()) {
+            playPcmNonBlocking(pcmBytes)
+        }
+    }
+
     private fun playPcmNonBlocking(pcmBytes: ByteArray) {
         audioScheduler.execute {
             var track: AudioTrack? = null
             try {
-                val bufferSize = maxOf(
-                    pcmBytes.size,
-                    AudioTrack.getMinBufferSize(
-                        sampleRate,
-                        AudioFormat.CHANNEL_OUT_MONO,
-                        AudioFormat.ENCODING_PCM_16BIT
-                    )
-                )
+                val minBuf = AudioTrack.getMinBufferSize(
+                    sampleRate,
+                    AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT
+                ).coerceAtLeast(2048)
+
+                // Ensure buffer size is even (16-bit PCM frame aligned) and at least minBuf.
+                // Critically, in MODE_STATIC we MUST pad the byte array to match bufferSize
+                // so track.write() fills 100% of the static buffer and transitions AudioTrack
+                // out of STATE_NO_STATIC_DATA into STATE_INITIALIZED before play() is called.
+                var targetBufferSize = maxOf(pcmBytes.size, minBuf)
+                if (targetBufferSize % 2 != 0) {
+                    targetBufferSize += 1
+                }
+
+                val fullPcmBuffer = if (pcmBytes.size == targetBufferSize) {
+                    pcmBytes
+                } else {
+                    ByteArray(targetBufferSize).also { padded ->
+                        System.arraycopy(pcmBytes, 0, padded, 0, pcmBytes.size)
+                    }
+                }
+
                 track = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     AudioTrack.Builder()
                         .setAudioAttributes(gameAudioAttributes)
                         .setAudioFormat(monoPcmFormat)
-                        .setBufferSizeInBytes(bufferSize)
+                        .setBufferSizeInBytes(fullPcmBuffer.size)
                         .setTransferMode(AudioTrack.MODE_STATIC)
                         .build()
                 } else {
@@ -227,17 +337,21 @@ class MainActivity : FlutterActivity() {
                         sampleRate,
                         AudioFormat.CHANNEL_OUT_MONO,
                         AudioFormat.ENCODING_PCM_16BIT,
-                        bufferSize,
+                        fullPcmBuffer.size,
                         AudioTrack.MODE_STATIC
                     )
                 }
 
-                track.write(pcmBytes, 0, pcmBytes.size)
-                track.play()
+                track.write(fullPcmBuffer, 0, fullPcmBuffer.size)
+                if (track.state == AudioTrack.STATE_INITIALIZED) {
+                    activeTracks.add(track)
+                    track.play()
+                }
 
-                val durationMs = ((pcmBytes.size.toLong() * 1000L) / (sampleRate * 2L)) + 80L
+                val durationMs = ((fullPcmBuffer.size.toLong() * 1000L) / (sampleRate * 2L)) + 120L
                 val trackToRelease = track
                 audioScheduler.schedule({
+                    activeTracks.remove(trackToRelease)
                     try {
                         trackToRelease.stop()
                     } catch (_: Throwable) {}
@@ -247,10 +361,32 @@ class MainActivity : FlutterActivity() {
                 }, durationMs, TimeUnit.MILLISECONDS)
             } catch (_: Throwable) {
                 try {
+                    track?.let { activeTracks.remove(it) }
                     track?.release()
                 } catch (_: Throwable) {}
             }
         }
+    }
+
+    private fun stopAllActiveAudio() {
+        try {
+            val pool = soundPool
+            if (pool != null) {
+                for (streamId in activeStreams) {
+                    try {
+                        pool.stop(streamId)
+                    } catch (_: Throwable) {}
+                }
+                activeStreams.clear()
+            }
+            for (track in activeTracks) {
+                try {
+                    track.pause()
+                    track.flush()
+                    track.stop()
+                } catch (_: Throwable) {}
+            }
+        } catch (_: Throwable) {}
     }
 
     @Suppress("DEPRECATION")
@@ -281,6 +417,10 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        stopAllActiveAudio()
+        try {
+            soundPool?.release()
+        } catch (_: Throwable) {}
         try {
             audioScheduler.shutdownNow()
         } catch (_: Throwable) {}

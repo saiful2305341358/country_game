@@ -4,51 +4,52 @@ import 'dart:typed_data';
 
 /// Shared procedural 16-bit 22050Hz PCM WAV synthesizer used by both Web and Mobile (Android/iOS).
 ///
-/// Gameplay card actions (`cardTap`, `cardPlace`, `cardTake`, `exchange`) use realistic
-/// physical paper/felt friction and damped wooden table acoustics (no musical pitch sweeps
-/// during normal turns), while musical chimes are reserved strictly for Game Start and Game Over.
+/// Specifically tuned for real mobile phone micro-speakers (300Hz–2200Hz mid-range harmonics,
+/// clear 45ms–90ms transient sustain, and 0.85–0.94 normalized peak amplitude) so card taps,
+/// tabletop placements, slides, dealing riffles, UI clicks, and chimes are loud, crisp, and
+/// unmistakable on every Android & iOS phone without external headphones.
 class SoundSynthesizer {
   static const int sampleRate = 22050;
 
   static Map<String, Uint8List> generateAllWavBytes() {
     return <String, Uint8List>{
       'cardTap': _generatePhysicalCardFlickWav(
-        durationMs: 30,
-        bodyFreq: 175.0,
-        volume: 0.52,
+        durationMs: 55,
+        bodyFreq: 310.0,
+        volume: 0.88,
       ),
       'cardPlace': _generatePhysicalCardPlaceWav(
-        durationMs: 44,
-        thumpFreq: 138.0,
-        volume: 0.58,
+        durationMs: 75,
+        thumpFreq: 260.0,
+        volume: 0.92,
       ),
       'cardTake': _generatePhysicalCardSlideWav(
-        durationMs: 56,
-        volume: 0.48,
+        durationMs: 85,
+        volume: 0.86,
       ),
       'exchange': _generatePhysicalDealRiffleWav(
         cardCount: 4,
-        stepMs: 55,
-        volume: 0.46,
+        stepMs: 60,
+        volume: 0.88,
       ),
       'buttonClick': _generateUiClickWav(
-        durationMs: 22,
-        volume: 0.45,
+        durationMs: 42,
+        volume: 0.86,
       ),
       'gameStart': _generateChimeWav(
         freqs: const [523.25, 659.25, 783.99],
-        stepDurationMs: 70,
-        volume: 0.48,
+        stepDurationMs: 80,
+        volume: 0.90,
       ),
       'gameEnd': _generateChimeWav(
         freqs: const [392.00, 329.63, 261.63],
-        stepDurationMs: 95,
-        volume: 0.50,
+        stepDurationMs: 105,
+        volume: 0.90,
       ),
       'victory': _generateChimeWav(
         freqs: const [523.25, 659.25, 783.99, 1046.50],
-        stepDurationMs: 85,
-        volume: 0.56,
+        stepDurationMs: 95,
+        volume: 0.94,
       ),
     };
   }
@@ -74,7 +75,7 @@ class SoundSynthesizer {
     return view;
   }
 
-  /// Crisp physical card-edge flick (short paper snap + damped low-mid body, no pitch sweep).
+  /// Crisp physical card-edge flick with mid-range body + upper-mid snap for phone speakers.
   static Uint8List _generatePhysicalCardFlickWav({
     required int durationMs,
     required double bodyFreq,
@@ -90,25 +91,28 @@ class SoundSynthesizer {
     for (int i = 0; i < totalSamples; i++) {
       final t = i / sampleRate;
       final progress = i / totalSamples;
-      final attack = (progress < 0.05) ? (progress / 0.05) : 1.0;
-      final decay = math.exp(-progress * 9.5);
+      final attack = (progress < 0.04) ? (progress / 0.04) : 1.0;
+      final decay = math.exp(-progress * 5.2);
       final env = attack * decay;
 
       final rawNoise = rng.nextDouble() * 2.0 - 1.0;
-      // High-passed paper snap
-      final crispPaper = (rawNoise - prevNoise * 0.72) * 0.65;
+      final crispPaper = (rawNoise - prevNoise * 0.68) * 0.72;
       prevNoise = rawNoise;
 
-      // Rapidly damped wooden/cardboard body
-      final body = math.sin(2 * math.pi * bodyFreq * t) * math.exp(-progress * 14.0);
-      final wave = (0.62 * crispPaper + 0.38 * body) * env * volume;
+      // Fundamental + 2nd & 3rd overtones so small phone speakers reproduce the card snap clearly
+      final body = (0.55 * math.sin(2 * math.pi * bodyFreq * t) +
+              0.30 * math.sin(2 * math.pi * (bodyFreq * 2.0) * t) +
+              0.15 * math.sin(2 * math.pi * (bodyFreq * 3.2) * t)) *
+          math.exp(-progress * 7.5);
+      final wave = ((0.52 * crispPaper + 0.58 * body) * env * volume)
+          .clamp(-0.98, 0.98);
       final sample = (wave * 32767).round().clamp(-32768, 32767);
       view.setInt16(44 + i * 2, sample, Endian.little);
     }
     return bytes;
   }
 
-  /// Soft physical card placement on table/grass (warm damped thump + paper settle).
+  /// Tactile physical card placement on table (warm mid-range wood/felt impact + paper settle).
   static Uint8List _generatePhysicalCardPlaceWav({
     required int durationMs,
     required double thumpFreq,
@@ -124,24 +128,27 @@ class SoundSynthesizer {
     for (int i = 0; i < totalSamples; i++) {
       final t = i / sampleRate;
       final progress = i / totalSamples;
-      final attack = (progress < 0.04) ? (progress / 0.04) : 1.0;
-      final decay = math.exp(-progress * 8.2);
+      final attack = (progress < 0.03) ? (progress / 0.03) : 1.0;
+      final decay = math.exp(-progress * 4.8);
       final env = attack * decay;
 
       final rawNoise = rng.nextDouble() * 2.0 - 1.0;
-      lpNoise = lpNoise * 0.65 + rawNoise * 0.35;
+      lpNoise = lpNoise * 0.55 + rawNoise * 0.45;
 
-      // Pitch drops slightly on impact like a real physical thud (138Hz -> 92Hz)
-      final instantFreq = thumpFreq * (1.0 - 0.32 * progress);
-      final thud = math.sin(2 * math.pi * instantFreq * t);
-      final wave = (0.68 * thud + 0.32 * lpNoise) * env * volume;
+      // Audible mid-range pitch drop (260Hz -> 175Hz + 520Hz/780Hz overtones)
+      final instantFreq = thumpFreq * (1.0 - 0.30 * progress);
+      final thud = 0.52 * math.sin(2 * math.pi * instantFreq * t) +
+          0.32 * math.sin(2 * math.pi * (instantFreq * 2.0) * t) +
+          0.16 * math.sin(2 * math.pi * (instantFreq * 3.0) * t);
+      final wave = ((0.68 * thud + 0.38 * lpNoise) * env * volume)
+          .clamp(-0.98, 0.98);
       final sample = (wave * 32767).round().clamp(-32768, 32767);
       view.setInt16(44 + i * 2, sample, Endian.little);
     }
     return bytes;
   }
 
-  /// Smooth physical card slide across felt/grass (band-filtered paper brush friction, no tone).
+  /// Smooth physical card slide & pickup across tabletop with audible mid-band friction.
   static Uint8List _generatePhysicalCardSlideWav({
     required int durationMs,
     required double volume,
@@ -155,15 +162,19 @@ class SoundSynthesizer {
     double bandState = 0.0;
     double prevRaw = 0.0;
     for (int i = 0; i < totalSamples; i++) {
+      final t = i / sampleRate;
       final progress = i / totalSamples;
-      final env = math.sin(math.pi * progress) * math.exp(-progress * 1.8);
+      final env = math.sin(math.pi * progress) * math.exp(-progress * 1.3);
 
       final raw = rng.nextDouble() * 2.0 - 1.0;
-      final hp = raw - prevRaw * 0.82;
+      final hp = raw - prevRaw * 0.76;
       prevRaw = raw;
-      bandState = bandState * 0.58 + hp * 0.42;
+      bandState = bandState * 0.52 + hp * 0.48;
 
-      final wave = bandState * env * volume * 1.35;
+      final slideResonance =
+          0.32 * math.sin(2 * math.pi * (420.0 + 240.0 * progress) * t);
+      final wave = ((0.75 * bandState + slideResonance) * env * volume * 1.35)
+          .clamp(-0.98, 0.98);
       final sample = (wave * 32767).round().clamp(-32768, 32767);
       view.setInt16(44 + i * 2, sample, Endian.little);
     }
@@ -178,8 +189,8 @@ class SoundSynthesizer {
   }) {
     final stepSamples = (sampleRate * (stepMs / 1000.0)).toInt();
     final singleFlick = _generatePhysicalCardFlickWav(
-      durationMs: 28,
-      bodyFreq: 185.0,
+      durationMs: 46,
+      bodyFreq: 330.0,
       volume: volume,
     );
     final flickSamples = (singleFlick.length - 44) ~/ 2;
@@ -201,7 +212,7 @@ class SoundSynthesizer {
     return bytes;
   }
 
-  /// Crisp, short tactile UI button tap.
+  /// Crisp, clear tactile UI button tap tuned for phone speakers.
   static Uint8List _generateUiClickWav({
     required int durationMs,
     required double volume,
@@ -214,12 +225,14 @@ class SoundSynthesizer {
     for (int i = 0; i < totalSamples; i++) {
       final t = i / sampleRate;
       final progress = i / totalSamples;
-      final env = math.exp(-progress * 11.0);
-      final wave = (0.7 * math.sin(2 * math.pi * 380.0 * t) +
-              0.3 * math.sin(2 * math.pi * 760.0 * t)) *
+      final attack = (progress < 0.04) ? (progress / 0.04) : 1.0;
+      final env = attack * math.exp(-progress * 6.2);
+      final wave = (0.52 * math.sin(2 * math.pi * 520.0 * t) +
+              0.33 * math.sin(2 * math.pi * 1040.0 * t) +
+              0.15 * math.sin(2 * math.pi * 1560.0 * t)) *
           env *
           volume;
-      final sample = (wave * 32767).round().clamp(-32768, 32767);
+      final sample = (wave.clamp(-0.98, 0.98) * 32767).round().clamp(-32768, 32767);
       view.setInt16(44 + i * 2, sample, Endian.little);
     }
     return bytes;
@@ -232,7 +245,7 @@ class SoundSynthesizer {
     required double volume,
   }) {
     final samplesPerNote = (sampleRate * (stepDurationMs / 1000.0)).toInt();
-    final tailSamples = (sampleRate * 0.16).toInt();
+    final tailSamples = (sampleRate * 0.22).toInt();
     final totalSamples = samplesPerNote * freqs.length + tailSamples;
     final byteCount = totalSamples * 2;
     final bytes = Uint8List(44 + byteCount);
@@ -245,18 +258,19 @@ class SoundSynthesizer {
       final noteStart = n * samplesPerNote;
       final noteLength = isLastNote
           ? samplesPerNote + tailSamples
-          : (samplesPerNote * 1.35).toInt();
+          : (samplesPerNote * 1.45).toInt();
 
       for (int i = 0; i < noteLength && (noteStart + i) < totalSamples; i++) {
         final t = i / sampleRate;
         final progress = i / noteLength;
-        final attack = (progress < 0.06) ? (progress / 0.06) : 1.0;
-        final decay = math.exp(-progress * (isLastNote ? 2.6 : 3.4));
+        final attack = (progress < 0.05) ? (progress / 0.05) : 1.0;
+        final decay = math.exp(-progress * (isLastNote ? 2.2 : 3.0));
         final env = attack * decay;
 
-        final wave = 0.68 * math.sin(2 * math.pi * freq * t) +
-            0.22 * math.sin(2 * math.pi * (freq * 2.0) * t) +
-            0.10 * math.sin(2 * math.pi * (freq * 3.0) * t);
+        final wave = 0.58 * math.sin(2 * math.pi * freq * t) +
+            0.26 * math.sin(2 * math.pi * (freq * 2.0) * t) +
+            0.12 * math.sin(2 * math.pi * (freq * 3.0) * t) +
+            0.04 * math.sin(2 * math.pi * (freq * 4.0) * t);
         mixBuffer[noteStart + i] += wave * env * volume;
       }
     }

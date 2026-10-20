@@ -44,10 +44,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const toggleAnimations = () => {
     const next = !settings.animationsEnabled;
     onUpdateSettings({ ...settings, animationsEnabled: next });
+    AudioService.playButtonClick();
     HapticService.uiTap();
   };
 
   const setBotDelay = (ms: number) => {
+    AudioService.playButtonClick();
     HapticService.uiTap();
     onUpdateSettings({ ...settings, botDelayMs: ms });
   };
@@ -70,29 +72,34 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     <div
       style={{
         background: 'radial-gradient(circle at center, #0F3B2C 0%, #09251B 55%, #03140E 100%)',
+        paddingTop: 'max(0.5rem, env(safe-area-inset-top))',
+        paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
+        paddingLeft: 'max(0.75rem, env(safe-area-inset-left))',
+        paddingRight: 'max(0.75rem, env(safe-area-inset-right))',
       }}
-      className="w-full h-full flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
+      className="w-full h-full flex items-center justify-center p-2.5 sm:p-6 overflow-y-auto select-none"
     >
-      <div className="w-full max-w-[820px] flex flex-col gap-3.5">
+      <div className="w-full max-w-[820px] flex flex-col gap-2.5 sm:gap-3.5 my-auto">
         {/* Top Header */}
         <div className="flex items-center justify-between">
           <button
             onClick={() => {
+              AudioService.playButtonClick();
               HapticService.uiTap();
               onBack();
             }}
-            className="w-10 h-10 rounded-full flex items-center justify-center text-[#FFD54F] hover:bg-white/10 cursor-pointer"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-[#FFD54F] hover:bg-white/10 cursor-pointer"
           >
-            <ArrowLeft size={22} />
+            <ArrowLeft size={20} />
           </button>
-          <h1 className="text-[#FFD700] text-lg font-bold tracking-wider">Settings</h1>
-          <div className="w-10 h-10" />
+          <h1 className="text-[#FFD700] text-base sm:text-lg font-bold tracking-wider">Settings</h1>
+          <div className="w-9 h-9 sm:w-10 sm:h-10" />
         </div>
 
         {/* Two-Column Landscape Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5">
           {/* Left Card: Audio & Haptics */}
-          <div className="p-4 rounded-[14px] bg-[#0F172A]/85 border border-[#D4AF37]/30 flex flex-col gap-3">
+          <div className="p-3 sm:p-4 rounded-[14px] bg-[#0F172A]/85 border border-[#D4AF37]/30 flex flex-col gap-2.5 sm:gap-3">
             <div className="text-[#FFE082] text-[11px] font-black tracking-[1.5px]">
               AUDIO & HAPTICS
             </div>

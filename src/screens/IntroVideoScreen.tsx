@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { SkipForward } from 'lucide-react';
+import { markIntroPlayedThisSession } from '../App';
 import { CountryCardView } from '../components/CountryCardView';
 import { GameLogo } from '../components/GameLogo';
 import { CountryType } from '../models/types';
@@ -8,6 +8,9 @@ import { AudioService, HapticService } from '../services/soundSynthesizer';
 interface IntroVideoScreenProps {
   onFinished: () => void;
 }
+
+const INTRO_WIDTH = 800;
+const INTRO_HEIGHT = 450;
 
 function cubicEase(t: number): number {
   const clamped = Math.max(0, Math.min(1, t));
@@ -19,8 +22,14 @@ function lerp(a: number, b: number, t: number): number {
 }
 
 export const IntroVideoScreen: React.FC<IntroVideoScreenProps> = ({ onFinished }) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const onFinishedRef = useRef(onFinished);
+  onFinishedRef.current = onFinished;
+
+  const [stageScale, setStageScale] = useState(0.8);
   const [t, setT] = useState(0);
   const completedRef = useRef(false);
+  const markedSessionRef = useRef(false);
   const playedLaunchRef = useRef(false);
   const playedLandRef = useRef(false);
   const playedChimeRef = useRef(false);
@@ -28,19 +37,51 @@ export const IntroVideoScreen: React.FC<IntroVideoScreenProps> = ({ onFinished }
   const finishIntro = () => {
     if (completedRef.current) return;
     completedRef.current = true;
-    onFinished();
+    markIntroPlayedThisSession();
+    onFinishedRef.current();
   };
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const updateScale = () => {
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      if (w > 0 && h > 0) {
+        const scale = Math.min((w - 16) / INTRO_WIDTH, (h - 8) / INTRO_HEIGHT);
+        setStageScale(Math.max(0.25, Math.min(1.15, scale)));
+      }
+    };
+    updateScale();
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(updateScale);
+      ro.observe(el);
+    }
+    window.addEventListener('resize', updateScale);
+    window.visualViewport?.addEventListener('resize', updateScale);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', updateScale);
+      window.visualViewport?.removeEventListener('resize', updateScale);
+    };
+  }, []);
 
   useEffect(() => {
     let animId = 0;
     const start = performance.now();
-    const duration = 2400;
+    const duration = 2300;
 
     const tick = (now: number) => {
       if (completedRef.current) return;
       const raw = (now - start) / duration;
       const clamped = Math.min(1, Math.max(0, raw));
       setT(clamped);
+
+      if (!markedSessionRef.current && clamped >= 0.12) {
+        markedSessionRef.current = true;
+        markIntroPlayedThisSession();
+      }
 
       if (!playedLaunchRef.current && clamped >= 0.28) {
         playedLaunchRef.current = true;
@@ -67,15 +108,19 @@ export const IntroVideoScreen: React.FC<IntroVideoScreenProps> = ({ onFinished }
     return () => cancelAnimationFrame(animId);
   }, []);
 
-  const leftTableSlot = { x: 302, y: 118 };
-  const rightTableSlot = { x: 412, y: 118 };
+  const leftTableSlot = { x: 304, y: 92 };
+  const rightTableSlot = { x: 412, y: 92 };
   const handSlots = [
-    { x: 224, y: 278 },
-    { x: 312, y: 268 },
-    { x: 400, y: 268 },
-    { x: 488, y: 278 },
+    { x: 226, y: 250 },
+    { x: 314, y: 240 },
+    { x: 402, y: 240 },
+    { x: 490, y: 250 },
   ];
   const handAngles = [-8, -3, 3, 8];
+
+  const stageFadeIn = Math.min(1, Math.max(0, t / 0.08));
+  const stageFadeOut = t > 0.93 ? Math.min(1, Math.max(0, (1 - t) / 0.07)) : 1;
+  const stageOpacity = Math.min(1, Math.max(0, stageFadeIn * stageFadeOut));
 
   const dealProgress = Math.min(1, Math.max(0, t / 0.22));
   const dealScale = cubicEase(dealProgress);
@@ -110,42 +155,67 @@ export const IntroVideoScreen: React.FC<IntroVideoScreenProps> = ({ onFinished }
 
   return (
     <div
-      onClick={finishIntro}
+      ref={containerRef}
       style={{
         background:
           'repeating-linear-gradient(90deg, rgba(255,255,255,0.14) 0 65px, rgba(255,255,255,0) 65px 130px), radial-gradient(ellipse at 50% 45%, rgba(255,255,255,0.28), rgba(255,255,255,0) 70%), #BFE3A5',
       }}
-      className="relative w-full h-full flex items-center justify-center overflow-hidden cursor-pointer"
+      className="relative w-full h-full overflow-hidden select-none"
     >
       {/* Vignette */}
       <div
         style={{
-          background: 'radial-gradient(circle at center, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.58) 100%)',
+          background:
+            'radial-gradient(circle at center, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.60) 100%)',
         }}
         className="absolute inset-0 pointer-events-none"
       />
 
-      {/* Skip Intro Button */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          finishIntro();
+      {/* Dynamically Scaled 800x450 Choreographed Stage */}
+      <div
+        style={{
+          width: `${INTRO_WIDTH}px`,
+          height: `${INTRO_HEIGHT}px`,
+          left: '50%',
+          top: '50%',
+          opacity: stageOpacity,
+          transform: `translate(-50%, -50%) scale(${stageScale})`,
+          transformOrigin: 'center center',
         }}
-        className="absolute top-3 right-4 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0F172A]/80 border border-[#FFD54F]/50 text-[#FFE082] text-xs font-extrabold tracking-wider hover:bg-[#0F172A] cursor-pointer"
+        className="absolute"
       >
-        <SkipForward size={15} />
-        SKIP INTRO
-      </button>
+        {/* Tabletop Card-Swap Zone Mat */}
+        <div
+          style={{
+            left: '274px',
+            top: '78px',
+            width: '252px',
+            height: '152px',
+          }}
+          className="absolute rounded-[24px] bg-[#06291D]/55 border border-[#FFD54F]/35 pointer-events-none"
+        />
 
-      {/* 800x450 Choreographed Stage */}
-      <div className="relative w-[800px] h-[450px] max-w-full max-h-full scale-[0.72] sm:scale-90 md:scale-100 origin-center">
+        {/* Golden Celebration Ring during 4-of-a-Kind Reveal */}
+        {celebrateT > 0 && (
+          <div
+            style={{
+              left: `${400 - (70 + celebrateT * 165)}px`,
+              top: `${304 - (70 + celebrateT * 165)}px`,
+              width: `${(70 + celebrateT * 165) * 2}px`,
+              height: `${(70 + celebrateT * 165) * 2}px`,
+              opacity: Math.max(0, 0.55 * (1 - celebrateT)),
+            }}
+            className="absolute rounded-full border-[3px] border-[#FFD54F] pointer-events-none"
+          />
+        )}
+
         {/* Top Title Emblem */}
         <div
           style={{ opacity: dealProgress }}
-          className="absolute top-[18px] left-0 right-0 flex justify-center z-20"
+          className="absolute top-[14px] left-0 right-0 flex justify-center z-20"
         >
           <div className="flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-[#0F172A]/90 border-[1.5px] border-[#FFD54F]/85 shadow-lg">
-            <GameLogo size={26} withGlow={false} />
+            <GameLogo size={24} withGlow={false} />
             <span className="text-[#FFD700] text-base font-black tracking-[2.2px]">
               COUNTRY GAME
             </span>
@@ -168,8 +238,8 @@ export const IntroVideoScreen: React.FC<IntroVideoScreenProps> = ({ onFinished }
         >
           <CountryCardView
             card={{ id: 'intro_jp_0', type: CountryType.japan, isStartingCard: false }}
-            width={86}
-            height={126}
+            width={84}
+            height={124}
           />
         </div>
 
@@ -184,8 +254,8 @@ export const IntroVideoScreen: React.FC<IntroVideoScreenProps> = ({ onFinished }
         >
           <CountryCardView
             card={{ id: 'intro_jp_1', type: CountryType.japan, isStartingCard: false }}
-            width={86}
-            height={126}
+            width={84}
+            height={124}
           />
         </div>
 
@@ -200,8 +270,8 @@ export const IntroVideoScreen: React.FC<IntroVideoScreenProps> = ({ onFinished }
         >
           <CountryCardView
             card={{ id: 'intro_jp_3', type: CountryType.japan, isStartingCard: false }}
-            width={86}
-            height={126}
+            width={84}
+            height={124}
           />
         </div>
 
@@ -217,8 +287,8 @@ export const IntroVideoScreen: React.FC<IntroVideoScreenProps> = ({ onFinished }
         >
           <CountryCardView
             card={{ id: 'intro_jp_table', type: CountryType.japan, isStartingCard: false }}
-            width={86}
-            height={126}
+            width={84}
+            height={124}
           />
         </div>
 
@@ -234,21 +304,18 @@ export const IntroVideoScreen: React.FC<IntroVideoScreenProps> = ({ onFinished }
         >
           <CountryCardView
             card={{ id: 'intro_au_2', type: CountryType.australia, isStartingCard: false }}
-            width={86}
-            height={126}
+            width={84}
+            height={124}
           />
         </div>
 
         {/* Bottom Caption & Progress */}
-        <div className="absolute bottom-[14px] left-0 right-0 flex flex-col items-center gap-1.5 z-20">
-          <div className="px-3.5 py-1 rounded-[14px] bg-[#0F172A]/85 border border-[#FFD54F]/45 text-[#FFE082] text-[11px] font-extrabold tracking-wider">
+        <div className="absolute bottom-[12px] left-0 right-0 flex flex-col items-center gap-1.5 z-20">
+          <div className="px-4 py-1 rounded-[14px] bg-[#0F172A]/90 border border-[#FFD54F]/50 text-[#FFE082] text-[11px] font-extrabold tracking-wider">
             {stepCaption}
           </div>
           <div className="w-[220px] h-1 rounded bg-black/40 overflow-hidden">
-            <div
-              style={{ width: `${t * 100}%` }}
-              className="h-full bg-[#FFD54F]"
-            />
+            <div style={{ width: `${t * 100}%` }} className="h-full bg-[#FFD54F]" />
           </div>
         </div>
       </div>

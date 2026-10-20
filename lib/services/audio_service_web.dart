@@ -24,6 +24,17 @@ class _SoundPool {
     _cursor = (_cursor + 1) % elements.length;
     return el;
   }
+
+  void stopAll() {
+    for (final el in elements) {
+      try {
+        if (!el.paused) {
+          el.pause();
+          el.currentTime = 0;
+        }
+      } catch (_) {}
+    }
+  }
 }
 
 class AudioServiceWeb implements AudioServiceInterface {
@@ -55,16 +66,39 @@ class AudioServiceWeb implements AudioServiceInterface {
   @override
   set isSoundEnabled(bool enabled) {
     _soundEnabled = enabled;
+    if (!enabled) {
+      stopAll();
+    }
     try {
       html.window.localStorage['country_game_sound_enabled'] =
           enabled.toString();
     } catch (_) {}
   }
 
+  void stopAll() {
+    for (final pool in _pools.values) {
+      pool.stopAll();
+    }
+  }
+
   void _setupUserGestureUnlock() {
     void unlockHandler(html.Event _) {
       if (_unlocked) return;
       _unlocked = true;
+      for (final pool in _pools.values) {
+        for (final el in pool.elements) {
+          try {
+            el.muted = true;
+            el.play().then((_) {
+              el.pause();
+              el.currentTime = 0;
+              el.muted = false;
+            }).catchError((_) {
+              el.muted = false;
+            });
+          } catch (_) {}
+        }
+      }
       for (final sub in _unlockSubscriptions) {
         sub.cancel();
       }
@@ -103,6 +137,7 @@ class AudioServiceWeb implements AudioServiceInterface {
     try {
       final audio = pool.next();
       try {
+        audio.muted = false;
         audio.currentTime = 0;
       } catch (_) {}
       audio.volume = 1.0;
@@ -136,6 +171,7 @@ class AudioServiceWeb implements AudioServiceInterface {
 
   @override
   void dispose() {
+    stopAll();
     for (final sub in _unlockSubscriptions) {
       sub.cancel();
     }

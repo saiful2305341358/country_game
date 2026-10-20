@@ -9,6 +9,9 @@ import 'services/stats_service.dart';
 import 'services/stats_storage_stub.dart'
     if (dart.library.html) 'services/stats_storage_web.dart';
 
+const String _kSessionIntroKey = '__session_intro_played__';
+bool _hasShownIntroInProcess = false;
+
 Future<void> _enforceLandscapeSystemUI() async {
   await SystemChrome.setPreferredOrientations(const [
     DeviceOrientation.landscapeLeft,
@@ -26,7 +29,13 @@ Future<void> main() async {
     soundEnabled: AudioService.instance.isSoundEnabled,
     hapticsEnabled: HapticService.instance.isHapticsEnabled,
   );
-  runApp(const CountryGameApp());
+
+  final bool alreadyPlayedIntro =
+      _hasShownIntroInProcess || StatsStorage.read(_kSessionIntroKey) == '1';
+  _hasShownIntroInProcess = true;
+  StatsStorage.write(_kSessionIntroKey, '1');
+
+  runApp(CountryGameApp(showIntroOnStart: !alreadyPlayedIntro));
 }
 
 class CountryGameApp extends StatefulWidget {
@@ -62,16 +71,16 @@ class _CountryGameAppState extends State<CountryGameApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _enforceLandscapeSystemUI();
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     }
   }
 
-  @override
-  void didChangeMetrics() {
-    SystemChrome.setPreferredOrientations(const [
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
+  void _handleIntroFinished() {
+    _hasShownIntroInProcess = true;
+    StatsStorage.write(_kSessionIntroKey, '1');
+    if (mounted && _showingIntro) {
+      setState(() => _showingIntro = false);
+    }
   }
 
   @override
@@ -95,27 +104,35 @@ class _CountryGameAppState extends State<CountryGameApp>
       },
       home: _showingIntro
           ? IntroVideoScreen(
-              onFinished: () {
-                if (mounted) {
-                  setState(() => _showingIntro = false);
-                }
-              },
+              key: const ValueKey<String>('single_session_intro'),
+              onFinished: _handleIntroFinished,
             )
-          : const MainMenuScreen(),
+          : const MainMenuScreen(
+              key: ValueKey<String>('main_menu_home'),
+            ),
     );
   }
 }
 
 /// Ensures the entire application tree (including all routes, dialogs, and overlays)
 /// always renders in a unified landscape coordinate space (`width >= height`) with
-/// controlled font scaling across Android, iOS, and Web viewports.
-class LandscapeViewportWrapper extends StatelessWidget {
+/// controlled font scaling across Android, iOS, and Web viewports, while preserving
+/// child subtree identity across portrait-to-landscape host transitions.
+class LandscapeViewportWrapper extends StatefulWidget {
   final Widget child;
 
   const LandscapeViewportWrapper({
     super.key,
     required this.child,
   });
+
+  @override
+  State<LandscapeViewportWrapper> createState() =>
+      _LandscapeViewportWrapperState();
+}
+
+class _LandscapeViewportWrapperState extends State<LandscapeViewportWrapper> {
+  final GlobalKey _navigatorSubtreeKey = GlobalKey();
 
   static EdgeInsets _rotateInsetsQuarterTurn1(EdgeInsets insets) {
     return EdgeInsets.fromLTRB(
@@ -133,6 +150,10 @@ class LandscapeViewportWrapper extends StatelessWidget {
       minScaleFactor: 0.85,
       maxScaleFactor: 1.12,
     );
+    final keyedChild = KeyedSubtree(
+      key: _navigatorSubtreeKey,
+      child: widget.child,
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -143,7 +164,7 @@ class LandscapeViewportWrapper extends StatelessWidget {
         if (!isPortraitHost) {
           return MediaQuery(
             data: mediaQuery.copyWith(textScaler: clampedTextScaler),
-            child: child,
+            child: keyedChild,
           );
         }
 
@@ -165,7 +186,7 @@ class LandscapeViewportWrapper extends StatelessWidget {
             child: SizedBox(
               width: landscapeSize.width,
               height: landscapeSize.height,
-              child: child,
+              child: keyedChild,
             ),
           ),
         );

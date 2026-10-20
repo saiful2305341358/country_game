@@ -1,6 +1,7 @@
-// Procedural 16-bit 22050Hz PCM WAV synthesizer & Audio/Haptic/Settings services
-// Faithfully ported from lib/services/sound_synthesizer.dart, audio_service_web.dart, and haptic_service_web.dart
-// Optimized with lazy per-key WAV synthesis, immediate mute/stopAll, and visibilitychange lifecycle handling.
+// Procedural 22050Hz PCM Audio & Haptic Engine optimized for Mobile Phones, Android WebView APKs, and Browsers.
+// Uses Web Audio API (AudioContext + in-memory AudioBuffer) as primary zero-latency engine
+// (eliminating Android WebView MediaPlayer data-URI failures and mobile autoplay blocks),
+// with automatic first-gesture unlock and HTMLAudioElement fallback.
 
 import { DEFAULT_GAME_SETTINGS, GameSettings } from '../models/types';
 
@@ -18,7 +19,14 @@ class SeededRandom {
   }
 }
 
-function createWavHeader(bytes: Uint8Array, byteCount: number): DataView {
+function clamp(val: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, val));
+}
+
+function floatSamplesToWavBytes(samples: Float32Array): Uint8Array {
+  const totalSamples = samples.length;
+  const byteCount = totalSamples * 2;
+  const bytes = new Uint8Array(44 + byteCount);
   const view = new DataView(bytes.buffer);
   view.setUint32(0, 0x52494646, false); // "RIFF"
   view.setUint32(4, 36 + byteCount, true);
@@ -33,171 +41,176 @@ function createWavHeader(bytes: Uint8Array, byteCount: number): DataView {
   view.setUint16(34, 16, true);
   view.setUint32(36, 0x64617461, false); // "data"
   view.setUint32(40, byteCount, true);
-  return view;
+
+  for (let i = 0; i < totalSamples; i++) {
+    const s = clamp(Math.round(samples[i] * 32767), -32768, 32767);
+    view.setInt16(44 + i * 2, s, true);
+  }
+  return bytes;
 }
 
-function clamp(val: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, val));
-}
-
-function generatePhysicalCardFlickWav(durationMs: number, bodyFreq: number, volume: number): Uint8Array {
+/// Crisp physical card-edge flick with mid-range body + upper-mid snap for phone speakers.
+function generatePhysicalCardFlickSamples(
+  durationMs: number,
+  bodyFreq: number,
+  volume: number
+): Float32Array {
   const totalSamples = Math.floor(SAMPLE_RATE * (durationMs / 1000.0));
-  const byteCount = totalSamples * 2;
-  const bytes = new Uint8Array(44 + byteCount);
-  const view = createWavHeader(bytes, byteCount);
+  const out = new Float32Array(totalSamples);
   const rng = new SeededRandom(101);
 
   let prevNoise = 0.0;
   for (let i = 0; i < totalSamples; i++) {
     const t = i / SAMPLE_RATE;
     const progress = i / totalSamples;
-    const attack = progress < 0.05 ? progress / 0.05 : 1.0;
-    const decay = Math.exp(-progress * 9.5);
+    const attack = progress < 0.04 ? progress / 0.04 : 1.0;
+    const decay = Math.exp(-progress * 5.2);
     const env = attack * decay;
 
     const rawNoise = rng.nextDouble() * 2.0 - 1.0;
-    const crispPaper = (rawNoise - prevNoise * 0.72) * 0.65;
+    const crispPaper = (rawNoise - prevNoise * 0.68) * 0.72;
     prevNoise = rawNoise;
 
-    const body = Math.sin(2 * Math.PI * bodyFreq * t) * Math.exp(-progress * 14.0);
-    const wave = (0.62 * crispPaper + 0.38 * body) * env * volume;
-    const sample = clamp(Math.round(wave * 32767), -32768, 32767);
-    view.setInt16(44 + i * 2, sample, true);
+    const body =
+      (0.55 * Math.sin(2 * Math.PI * bodyFreq * t) +
+        0.3 * Math.sin(2 * Math.PI * (bodyFreq * 2.0) * t) +
+        0.15 * Math.sin(2 * Math.PI * (bodyFreq * 3.2) * t)) *
+      Math.exp(-progress * 7.5);
+    out[i] = clamp((0.52 * crispPaper + 0.58 * body) * env * volume, -0.98, 0.98);
   }
-  return bytes;
+  return out;
 }
 
-function generatePhysicalCardPlaceWav(durationMs: number, thumpFreq: number, volume: number): Uint8Array {
+/// Tactile physical card placement on table (warm mid-range wood/felt impact + paper settle).
+function generatePhysicalCardPlaceSamples(
+  durationMs: number,
+  thumpFreq: number,
+  volume: number
+): Float32Array {
   const totalSamples = Math.floor(SAMPLE_RATE * (durationMs / 1000.0));
-  const byteCount = totalSamples * 2;
-  const bytes = new Uint8Array(44 + byteCount);
-  const view = createWavHeader(bytes, byteCount);
+  const out = new Float32Array(totalSamples);
   const rng = new SeededRandom(202);
 
   let lpNoise = 0.0;
   for (let i = 0; i < totalSamples; i++) {
     const t = i / SAMPLE_RATE;
     const progress = i / totalSamples;
-    const attack = progress < 0.04 ? progress / 0.04 : 1.0;
-    const decay = Math.exp(-progress * 8.2);
+    const attack = progress < 0.03 ? progress / 0.03 : 1.0;
+    const decay = Math.exp(-progress * 4.8);
     const env = attack * decay;
 
     const rawNoise = rng.nextDouble() * 2.0 - 1.0;
-    lpNoise = lpNoise * 0.65 + rawNoise * 0.35;
+    lpNoise = lpNoise * 0.55 + rawNoise * 0.45;
 
-    const instantFreq = thumpFreq * (1.0 - 0.32 * progress);
-    const thud = Math.sin(2 * Math.PI * instantFreq * t);
-    const wave = (0.68 * thud + 0.32 * lpNoise) * env * volume;
-    const sample = clamp(Math.round(wave * 32767), -32768, 32767);
-    view.setInt16(44 + i * 2, sample, true);
+    const instantFreq = thumpFreq * (1.0 - 0.3 * progress);
+    const thud =
+      0.52 * Math.sin(2 * Math.PI * instantFreq * t) +
+      0.32 * Math.sin(2 * Math.PI * (instantFreq * 2.0) * t) +
+      0.16 * Math.sin(2 * Math.PI * (instantFreq * 3.0) * t);
+    out[i] = clamp((0.68 * thud + 0.38 * lpNoise) * env * volume, -0.98, 0.98);
   }
-  return bytes;
+  return out;
 }
 
-function generatePhysicalCardSlideWav(durationMs: number, volume: number): Uint8Array {
+/// Smooth physical card slide & pickup across tabletop with audible mid-band friction.
+function generatePhysicalCardSlideSamples(durationMs: number, volume: number): Float32Array {
   const totalSamples = Math.floor(SAMPLE_RATE * (durationMs / 1000.0));
-  const byteCount = totalSamples * 2;
-  const bytes = new Uint8Array(44 + byteCount);
-  const view = createWavHeader(bytes, byteCount);
+  const out = new Float32Array(totalSamples);
   const rng = new SeededRandom(303);
 
   let bandState = 0.0;
   let prevRaw = 0.0;
   for (let i = 0; i < totalSamples; i++) {
+    const t = i / SAMPLE_RATE;
     const progress = i / totalSamples;
-    const env = Math.sin(Math.PI * progress) * Math.exp(-progress * 1.8);
+    const env = Math.sin(Math.PI * progress) * Math.exp(-progress * 1.3);
 
     const raw = rng.nextDouble() * 2.0 - 1.0;
-    const hp = raw - prevRaw * 0.82;
+    const hp = raw - prevRaw * 0.76;
     prevRaw = raw;
-    bandState = bandState * 0.58 + hp * 0.42;
+    bandState = bandState * 0.52 + hp * 0.48;
 
-    const wave = bandState * env * volume * 1.35;
-    const sample = clamp(Math.round(wave * 32767), -32768, 32767);
-    view.setInt16(44 + i * 2, sample, true);
+    const slideResonance = 0.32 * Math.sin(2 * Math.PI * (420.0 + 240.0 * progress) * t);
+    out[i] = clamp((0.75 * bandState + slideResonance) * env * volume * 1.35, -0.98, 0.98);
   }
-  return bytes;
+  return out;
 }
 
-function generatePhysicalDealRiffleWav(cardCount: number, stepMs: number, volume: number): Uint8Array {
+/// Physical multi-card dealing riffle (series of 4 crisp paper snaps).
+function generatePhysicalDealRiffleSamples(
+  cardCount: number,
+  stepMs: number,
+  volume: number
+): Float32Array {
   const stepSamples = Math.floor(SAMPLE_RATE * (stepMs / 1000.0));
-  const singleFlick = generatePhysicalCardFlickWav(28, 185.0, volume);
-  const flickSamples = Math.floor((singleFlick.length - 44) / 2);
+  const singleFlick = generatePhysicalCardFlickSamples(46, 330.0, volume);
+  const flickSamples = singleFlick.length;
   const totalSamples = stepSamples * (cardCount - 1) + flickSamples;
-  const byteCount = totalSamples * 2;
-  const bytes = new Uint8Array(44 + byteCount);
-  const view = createWavHeader(bytes, byteCount);
-  const singleView = new DataView(singleFlick.buffer);
+  const out = new Float32Array(totalSamples);
 
   for (let c = 0; c < cardCount; c++) {
     const offset = c * stepSamples;
     for (let i = 0; i < flickSamples && offset + i < totalSamples; i++) {
-      const existing = view.getInt16(44 + (offset + i) * 2, true);
-      const add = singleView.getInt16(44 + i * 2, true);
-      const sum = clamp(existing + add, -32768, 32767);
-      view.setInt16(44 + (offset + i) * 2, sum, true);
+      out[offset + i] = clamp(out[offset + i] + singleFlick[i], -0.98, 0.98);
     }
   }
-  return bytes;
+  return out;
 }
 
-function generateUiClickWav(durationMs: number, volume: number): Uint8Array {
+/// Crisp, clear tactile UI button tap tuned for phone speakers.
+function generateUiClickSamples(durationMs: number, volume: number): Float32Array {
   const totalSamples = Math.floor(SAMPLE_RATE * (durationMs / 1000.0));
-  const byteCount = totalSamples * 2;
-  const bytes = new Uint8Array(44 + byteCount);
-  const view = createWavHeader(bytes, byteCount);
+  const out = new Float32Array(totalSamples);
 
   for (let i = 0; i < totalSamples; i++) {
     const t = i / SAMPLE_RATE;
     const progress = i / totalSamples;
-    const env = Math.exp(-progress * 11.0);
+    const attack = progress < 0.04 ? progress / 0.04 : 1.0;
+    const env = attack * Math.exp(-progress * 6.2);
     const wave =
-      (0.7 * Math.sin(2 * Math.PI * 380.0 * t) + 0.3 * Math.sin(2 * Math.PI * 760.0 * t)) *
+      (0.52 * Math.sin(2 * Math.PI * 520.0 * t) +
+        0.33 * Math.sin(2 * Math.PI * 1040.0 * t) +
+        0.15 * Math.sin(2 * Math.PI * 1560.0 * t)) *
       env *
       volume;
-    const sample = clamp(Math.round(wave * 32767), -32768, 32767);
-    view.setInt16(44 + i * 2, sample, true);
+    out[i] = clamp(wave, -0.98, 0.98);
   }
-  return bytes;
+  return out;
 }
 
-function generateChimeWav(freqs: number[], stepDurationMs: number, volume: number): Uint8Array {
+/// Warm harmonic bell chime reserved strictly for Game Start and Game Over / Victory.
+function generateChimeSamples(
+  freqs: number[],
+  stepDurationMs: number,
+  volume: number
+): Float32Array {
   const samplesPerNote = Math.floor(SAMPLE_RATE * (stepDurationMs / 1000.0));
-  const tailSamples = Math.floor(SAMPLE_RATE * 0.16);
+  const tailSamples = Math.floor(SAMPLE_RATE * 0.22);
   const totalSamples = samplesPerNote * freqs.length + tailSamples;
-  const byteCount = totalSamples * 2;
-  const bytes = new Uint8Array(44 + byteCount);
-  const view = createWavHeader(bytes, byteCount);
-  const mixBuffer = new Float64Array(totalSamples);
+  const out = new Float32Array(totalSamples);
 
   for (let n = 0; n < freqs.length; n++) {
     const freq = freqs[n];
     const isLastNote = n === freqs.length - 1;
     const noteStart = n * samplesPerNote;
-    const noteLength = isLastNote ? samplesPerNote + tailSamples : Math.floor(samplesPerNote * 1.35);
+    const noteLength = isLastNote ? samplesPerNote + tailSamples : Math.floor(samplesPerNote * 1.45);
 
     for (let i = 0; i < noteLength && noteStart + i < totalSamples; i++) {
       const t = i / SAMPLE_RATE;
       const progress = i / noteLength;
-      const attack = progress < 0.06 ? progress / 0.06 : 1.0;
-      const decay = Math.exp(-progress * (isLastNote ? 2.6 : 3.4));
+      const attack = progress < 0.05 ? progress / 0.05 : 1.0;
+      const decay = Math.exp(-progress * (isLastNote ? 2.2 : 3.0));
       const env = attack * decay;
 
       const wave =
-        0.68 * Math.sin(2 * Math.PI * freq * t) +
-        0.22 * Math.sin(2 * Math.PI * (freq * 2.0) * t) +
-        0.1 * Math.sin(2 * Math.PI * (freq * 3.0) * t);
-      mixBuffer[noteStart + i] += wave * env * volume;
+        0.58 * Math.sin(2 * Math.PI * freq * t) +
+        0.26 * Math.sin(2 * Math.PI * (freq * 2.0) * t) +
+        0.12 * Math.sin(2 * Math.PI * (freq * 3.0) * t) +
+        0.04 * Math.sin(2 * Math.PI * (freq * 4.0) * t);
+      out[noteStart + i] = clamp(out[noteStart + i] + wave * env * volume, -0.98, 0.98);
     }
   }
-
-  for (let i = 0; i < totalSamples; i++) {
-    const clamped = clamp(mixBuffer[i], -0.98, 0.98);
-    const sample = clamp(Math.round(clamped * 32767), -32768, 32767);
-    view.setInt16(44 + i * 2, sample, true);
-  }
-
-  return bytes;
+  return out;
 }
 
 function uint8ToDataUri(bytes: Uint8Array): string {
@@ -253,9 +266,26 @@ type SoundKey =
   | 'gameEnd'
   | 'victory';
 
+type WebAudioContextConstructor = typeof AudioContext;
+
+function getAudioContextConstructor(): WebAudioContextConstructor | null {
+  if (typeof window === 'undefined') return null;
+  const w = window as unknown as {
+    AudioContext?: WebAudioContextConstructor;
+    webkitAudioContext?: WebAudioContextConstructor;
+  };
+  return w.AudioContext || w.webkitAudioContext || null;
+}
+
 class AudioServiceImpl {
   private _soundEnabled = true;
+  private audioCtx: AudioContext | null = null;
+  private masterGain: GainNode | null = null;
+  private floatCache: Partial<Record<SoundKey, Float32Array>> = {};
+  private audioBuffers: Partial<Record<SoundKey, AudioBuffer>> = {};
+  private activeSources: Set<AudioBufferSourceNode> = new Set();
   private pools: Partial<Record<SoundKey, SoundPool>> = {};
+  private unlocked = false;
 
   constructor() {
     try {
@@ -267,60 +297,138 @@ class AudioServiceImpl {
       // ignore
     }
 
-    // Warm up sound pools during browser idle time after initial paint
     if (typeof window !== 'undefined') {
+      this.setupMobileGestureUnlock();
+
       const warmup = () => {
         try {
-          this.getOrCreatePool('buttonClick');
-          this.getOrCreatePool('cardTap');
-          this.getOrCreatePool('cardPlace');
-          this.getOrCreatePool('cardTake');
+          this.getOrCreateSamples('buttonClick');
+          this.getOrCreateSamples('cardTap');
+          this.getOrCreateSamples('cardPlace');
+          this.getOrCreateSamples('cardTake');
+          this.getOrCreateSamples('exchange');
         } catch {
           // ignore
         }
       };
+
       if ('requestIdleCallback' in window) {
-        (window as unknown as { requestIdleCallback: (cb: () => void) => void }).requestIdleCallback(warmup);
+        (window as unknown as { requestIdleCallback: (cb: () => void) => void }).requestIdleCallback(
+          warmup
+        );
       } else {
-        setTimeout(warmup, 250);
+        setTimeout(warmup, 120);
       }
 
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
           this.stopAll();
+        } else if (this._soundEnabled && this.audioCtx && this.audioCtx.state === 'suspended') {
+          this.audioCtx.resume().catch(() => {});
         }
       });
     }
   }
 
-  private synthesizeBytes(key: SoundKey): Uint8Array {
-    switch (key) {
-      case 'cardTap':
-        return generatePhysicalCardFlickWav(30, 175.0, 0.52);
-      case 'cardPlace':
-        return generatePhysicalCardPlaceWav(44, 138.0, 0.58);
-      case 'cardTake':
-        return generatePhysicalCardSlideWav(56, 0.48);
-      case 'exchange':
-        return generatePhysicalDealRiffleWav(4, 55, 0.46);
-      case 'buttonClick':
-        return generateUiClickWav(22, 0.45);
-      case 'gameStart':
-        return generateChimeWav([523.25, 659.25, 783.99], 70, 0.48);
-      case 'gameEnd':
-        return generateChimeWav([392.0, 329.63, 261.63], 95, 0.5);
-      case 'victory':
-        return generateChimeWav([523.25, 659.25, 783.99, 1046.5], 85, 0.56);
+  private setupMobileGestureUnlock(): void {
+    const unlockEvents = ['pointerdown', 'touchstart', 'touchend', 'mousedown', 'keydown', 'click'];
+    const onGesture = () => {
+      try {
+        const ctx = this.ensureAudioContext();
+        if (ctx) {
+          if (ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+          }
+          if (!this.unlocked) {
+            this.unlocked = true;
+            // Play a 1-sample silent buffer to permanently unlock hardware audio on Android WebView & iOS
+            const silentBuf = ctx.createBuffer(1, 1, SAMPLE_RATE);
+            const src = ctx.createBufferSource();
+            src.buffer = silentBuf;
+            src.connect(ctx.destination);
+            src.start(0);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    for (const evt of unlockEvents) {
+      window.addEventListener(evt, onGesture, { capture: true, passive: true });
     }
   }
 
-  private getOrCreatePool(key: SoundKey): SoundPool | null {
+  private ensureAudioContext(): AudioContext | null {
+    if (this.audioCtx) {
+      return this.audioCtx;
+    }
+    const Ctor = getAudioContextConstructor();
+    if (!Ctor) return null;
+    try {
+      this.audioCtx = new Ctor();
+      this.masterGain = this.audioCtx.createGain();
+      this.masterGain.gain.value = this._soundEnabled ? 1.0 : 0.0;
+      this.masterGain.connect(this.audioCtx.destination);
+      return this.audioCtx;
+    } catch {
+      return null;
+    }
+  }
+
+  private synthesizeSamples(key: SoundKey): Float32Array {
+    switch (key) {
+      case 'cardTap':
+        return generatePhysicalCardFlickSamples(55, 310.0, 0.88);
+      case 'cardPlace':
+        return generatePhysicalCardPlaceSamples(75, 260.0, 0.92);
+      case 'cardTake':
+        return generatePhysicalCardSlideSamples(85, 0.86);
+      case 'exchange':
+        return generatePhysicalDealRiffleSamples(4, 60, 0.88);
+      case 'buttonClick':
+        return generateUiClickSamples(42, 0.86);
+      case 'gameStart':
+        return generateChimeSamples([523.25, 659.25, 783.99], 80, 0.9);
+      case 'gameEnd':
+        return generateChimeSamples([392.0, 329.63, 261.63], 105, 0.9);
+      case 'victory':
+        return generateChimeSamples([523.25, 659.25, 783.99, 1046.5], 95, 0.94);
+    }
+  }
+
+  private getOrCreateSamples(key: SoundKey): Float32Array {
+    let samples = this.floatCache[key];
+    if (!samples) {
+      samples = this.synthesizeSamples(key);
+      this.floatCache[key] = samples;
+    }
+    return samples;
+  }
+
+  private getOrCreateAudioBuffer(ctx: AudioContext, key: SoundKey): AudioBuffer | null {
+    const existing = this.audioBuffers[key];
+    if (existing) return existing;
+    try {
+      const samples = this.getOrCreateSamples(key);
+      const buffer = ctx.createBuffer(1, samples.length, SAMPLE_RATE);
+      const channel = buffer.getChannelData(0);
+      channel.set(samples);
+      this.audioBuffers[key] = buffer;
+      return buffer;
+    } catch {
+      return null;
+    }
+  }
+
+  private getOrCreateFallbackPool(key: SoundKey): SoundPool | null {
     const existing = this.pools[key];
     if (existing) return existing;
     try {
-      const bytes = this.synthesizeBytes(key);
+      const samples = this.getOrCreateSamples(key);
+      const wavBytes = floatSamplesToWavBytes(samples);
       const isFrequent = key === 'cardTap' || key === 'cardPlace' || key === 'cardTake';
-      const pool = new SoundPool(uint8ToDataUri(bytes), isFrequent ? 3 : 2);
+      const pool = new SoundPool(uint8ToDataUri(wavBytes), isFrequent ? 3 : 2);
       this.pools[key] = pool;
       return pool;
     } catch {
@@ -334,6 +442,13 @@ class AudioServiceImpl {
 
   set isSoundEnabled(enabled: boolean) {
     this._soundEnabled = enabled;
+    if (this.masterGain && this.audioCtx) {
+      try {
+        this.masterGain.gain.setValueAtTime(enabled ? 1.0 : 0.0, this.audioCtx.currentTime);
+      } catch {
+        this.masterGain.gain.value = enabled ? 1.0 : 0.0;
+      }
+    }
     if (!enabled) {
       this.stopAll();
     }
@@ -345,6 +460,16 @@ class AudioServiceImpl {
   }
 
   stopAll(): void {
+    for (const src of this.activeSources) {
+      try {
+        src.stop();
+        src.disconnect();
+      } catch {
+        // ignore
+      }
+    }
+    this.activeSources.clear();
+
     for (const pool of Object.values(this.pools)) {
       pool?.stopAll();
     }
@@ -353,7 +478,33 @@ class AudioServiceImpl {
   private playSound(key: SoundKey) {
     if (!this._soundEnabled) return;
     if (typeof document !== 'undefined' && document.hidden) return;
-    const pool = this.getOrCreatePool(key);
+
+    // 1. Primary Engine: Web Audio API (zero-latency in-memory AudioBuffer, works in all Android WebViews & mobile browsers)
+    const ctx = this.ensureAudioContext();
+    if (ctx) {
+      try {
+        if (ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
+        }
+        const buffer = this.getOrCreateAudioBuffer(ctx, key);
+        if (buffer) {
+          const source = ctx.createBufferSource();
+          source.buffer = buffer;
+          source.connect(this.masterGain ?? ctx.destination);
+          this.activeSources.add(source);
+          source.onended = () => {
+            this.activeSources.delete(source);
+          };
+          source.start(0);
+          return;
+        }
+      } catch {
+        // Fallback to HTMLAudioElement pool below
+      }
+    }
+
+    // 2. Secondary Fallback: HTMLAudioElement pool
+    const pool = this.getOrCreateFallbackPool(key);
     if (!pool) return;
     try {
       const audio = pool.next();
@@ -440,31 +591,31 @@ class HapticServiceImpl {
   }
 
   cardTap() {
-    this.vibrate(12);
+    this.vibrate(14);
   }
   cardPass() {
-    this.vibrate(22);
+    this.vibrate(24);
   }
   invalidMove() {
-    this.vibrate([18, 45, 24]);
+    this.vibrate([20, 45, 28]);
   }
   botTurnTick() {
-    this.vibrate(8);
+    this.vibrate(10);
   }
   yourTurnNotice() {
-    this.vibrate([14, 35, 22]);
+    this.vibrate([16, 35, 24]);
   }
   dealShuffle() {
-    this.vibrate([10, 30, 12, 30, 16]);
+    this.vibrate([12, 30, 14, 30, 18]);
   }
   victory() {
-    this.vibrate([35, 50, 45, 50, 85]);
+    this.vibrate([40, 50, 50, 50, 90]);
   }
   roundEnd() {
-    this.vibrate([25, 60, 40]);
+    this.vibrate([28, 60, 42]);
   }
   uiTap() {
-    this.vibrate(10);
+    this.vibrate(12);
   }
 }
 

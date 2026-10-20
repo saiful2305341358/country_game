@@ -184,20 +184,28 @@ export const GameScreen: React.FC<GameScreenProps> = ({
   const recordedWinRef = useRef(false);
   const isProcessingMoveRef = useRef(false);
 
-  // Measure viewport to scale 1920x1080 stage cleanly
+  // Measure viewport to scale 1920x1080 stage cleanly on all mobile orientations
   useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
     const updateScale = () => {
-      const el = containerRef.current;
-      if (!el) return;
       const w = el.clientWidth;
       const h = el.clientHeight;
-      const scale = Math.min(w / STAGE_WIDTH, h / STAGE_HEIGHT);
-      setStageScale(Math.max(0.15, scale));
+      if (w > 0 && h > 0) {
+        const scale = Math.min(w / STAGE_WIDTH, h / STAGE_HEIGHT);
+        setStageScale(Math.max(0.15, scale));
+      }
     };
     updateScale();
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(updateScale);
+      ro.observe(el);
+    }
     window.addEventListener('resize', updateScale);
     window.visualViewport?.addEventListener('resize', updateScale);
     return () => {
+      ro?.disconnect();
       window.removeEventListener('resize', updateScale);
       window.visualViewport?.removeEventListener('resize', updateScale);
     };
@@ -512,17 +520,19 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         background:
           'repeating-linear-gradient(90deg, rgba(255,255,255,0.14) 0 80px, rgba(255,255,255,0) 80px 160px), radial-gradient(ellipse at 50% 45%, rgba(255,255,255,0.28), rgba(255,255,255,0) 70%), #BFE3A5',
       }}
-      className="relative w-full h-full flex items-center justify-center overflow-hidden select-none"
+      className="relative w-full h-full overflow-hidden select-none"
     >
       {/* Scaled 1920x1080 Stage */}
       <div
         style={{
           width: `${STAGE_WIDTH}px`,
           height: `${STAGE_HEIGHT}px`,
-          transform: `scale(${stageScale})`,
+          left: '50%',
+          top: '50%',
+          transform: `translate(-50%, -50%) scale(${stageScale})`,
           transformOrigin: 'center center',
         }}
-        className="relative shrink-0"
+        className="absolute"
       >
         {/* Top-Left Back Button (opens dedicated Exit Confirmation Dialog) */}
         <button
@@ -570,16 +580,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
             <circle cx="12" cy="18.2" r="1.45" fill="#2A2160" />
           </svg>
         </button>
-
-        {/* Top-Center Status Pill */}
-        <div
-          style={{ left: '460px', right: '460px', top: '34px' }}
-          className="absolute flex justify-center pointer-events-none"
-        >
-          <div className="px-6 py-2 rounded-full bg-[#2A2160]/90 border-2 border-[#FFD54F]/75 text-[#FFE082] text-[20px] font-bold tracking-wide shadow-lg truncate">
-            {state.statusMessage}
-          </div>
-        </div>
 
         {/* Top-Right Player Stats Button */}
         <button

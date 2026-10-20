@@ -454,12 +454,12 @@ void main() {
     expect(TutorialModalOverlay.hasSeenTutorial, isTrue);
   });
 
-  testWidgets('IntroVideoScreen plays short lightweight card-matching intro on app launch and supports Skip', (WidgetTester tester) async {
+  testWidgets('IntroVideoScreen plays short lightweight card-matching intro once on app launch without Skip button', (WidgetTester tester) async {
     await tester.pumpWidget(const CountryGameApp());
 
-    // Initially renders the intro sequence
+    // Initially renders the intro sequence without a Skip Intro button
     expect(find.byType(IntroVideoScreen), findsOneWidget);
-    expect(find.text('SKIP INTRO'), findsOneWidget);
+    expect(find.text('SKIP INTRO'), findsNothing);
     expect(find.text('COLLECT MATCHING COUNTRY CARDS...'), findsOneWidget);
 
     // Advance into the card swap phase
@@ -467,7 +467,7 @@ void main() {
     expect(find.text('SWAP ONE CARD WITH THE TABLE...'), findsOneWidget);
 
     // Advance into the 4-of-a-kind completion phase
-    await tester.pump(const Duration(milliseconds: 950));
+    await tester.pump(const Duration(milliseconds: 900));
     expect(find.text('COMPLETE THE COUNTRY SET TO WIN!'), findsOneWidget);
     expect(find.text('4 OF A KIND!'), findsOneWidget);
 
