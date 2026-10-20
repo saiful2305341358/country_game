@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CardBackView, CountryCardView } from '../components/CountryCardView';
 import {
   CelebrationParticlesCanvas,
+  ExitConfirmationDialog,
   GameControlsDialog,
   PlayerStatsOverlay,
   TutorialModalOverlay,
@@ -166,10 +167,14 @@ export const GameScreen: React.FC<GameScreenProps> = ({
   const [lockedOldTableSlotPos, setLockedOldTableSlotPos] = useState(LEFT_TABLE_SLOT);
   const [lockedIncomingTableSlotPos, setLockedIncomingTableSlotPos] = useState(RIGHT_TABLE_SLOT);
 
+  const [showExitConfirmDialog, setShowExitConfirmDialog] = useState(false);
   const [showPauseDialog, setShowPauseDialog] = useState(false);
   const [showStatsOverlay, setShowStatsOverlay] = useState(false);
   const [showTutorialOverlay, setShowTutorialOverlay] = useState<boolean>(
     () => !StatsService.hasSeenTutorial()
+  );
+  const [isDocumentHidden, setIsDocumentHidden] = useState<boolean>(
+    () => typeof document !== 'undefined' && document.hidden
   );
   const [celebrationOrigin, setCelebrationOrigin] = useState<{ x: number; y: number }>({
     x: 0.5,
@@ -177,6 +182,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
   });
 
   const recordedWinRef = useRef(false);
+  const isProcessingMoveRef = useRef(false);
 
   // Measure viewport to scale 1920x1080 stage cleanly
   useEffect(() => {
@@ -190,8 +196,38 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     };
     updateScale();
     window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
+    window.visualViewport?.addEventListener('resize', updateScale);
+    return () => {
+      window.removeEventListener('resize', updateScale);
+      window.visualViewport?.removeEventListener('resize', updateScale);
+    };
   }, []);
+
+  // Pause bot progression on screen sleep / backgrounding and intercept Android hardware Back
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      setIsDocumentHidden(document.hidden);
+    };
+    const onHardwareBack = () => {
+      if (showStatsOverlay) {
+        setShowStatsOverlay(false);
+      } else if (showTutorialOverlay) {
+        setShowTutorialOverlay(false);
+      } else if (showPauseDialog) {
+        setShowPauseDialog(false);
+      } else if (!showExitConfirmDialog) {
+        AudioService.playButtonClick();
+        HapticService.uiTap();
+        setShowExitConfirmDialog(true);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('ccg-hardware-back', onHardwareBack);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('ccg-hardware-back', onHardwareBack);
+    };
+  }, [showStatsOverlay, showTutorialOverlay, showPauseDialog, showExitConfirmDialog]);
 
   // Record initial game started
   useEffect(() => {
@@ -251,6 +287,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
       }
 
       if (p >= 1) {
+        isProcessingMoveRef.current = false;
         setIsAnimatingExchange(false);
         setAnimatingPlayerIndex(null);
         setAnimatingHandIndex(null);
@@ -290,12 +327,17 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
   const performMove = useCallback(
     (card: GameCard) => {
+      if (isProcessingMoveRef.current || isDealing || isAnimatingExchange) {
+        return false;
+      }
       const { nextState, isValid } = executeGameMove(state, card);
       if (!isValid) {
         HapticService.invalidMove();
         setState(nextState);
         return false;
       }
+
+      isProcessingMoveRef.current = true;
 
       const wasBot = state.currentTurnPlayerIndex !== 0;
       if (wasBot) {
@@ -330,18 +372,24 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         setExchangeProgress(0);
         setIsAnimatingExchange(true);
       } else {
+        isProcessingMoveRef.current = false;
         AudioService.playCardPlace();
       }
 
       setState(nextState);
       return true;
     },
-    [settings.animationsEnabled, state]
+    [isDealing, isAnimatingExchange, settings.animationsEnabled, state]
   );
 
   // Bot turn scheduler
   useEffect(() => {
-    const isPaused = showPauseDialog || showStatsOverlay || showTutorialOverlay;
+    const isPaused =
+      isDocumentHidden ||
+      showExitConfirmDialog ||
+      showPauseDialog ||
+      showStatsOverlay ||
+      showTutorialOverlay;
     if (
       isDealing ||
       isAnimatingExchange ||
@@ -372,6 +420,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({
   }, [
     isDealing,
     isAnimatingExchange,
+    isDocumentHidden,
+    showExitConfirmDialog,
     showPauseDialog,
     showStatsOverlay,
     showTutorialOverlay,
@@ -383,6 +433,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
   const handleRestartMatch = () => {
     recordedWinRef.current = false;
+    isProcessingMoveRef.current = false;
     const fresh = createInitialGameState(totalPlayers, predefinedTypes);
     setState(fresh);
     setIsAnimatingExchange(false);
@@ -412,6 +463,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({
   const canHumanAct =
     !isDealing &&
     !isAnimatingExchange &&
+    !showExitConfirmDialog &&
+    !showPauseDialog &&
+    !showStatsOverlay &&
+    !showTutorialOverlay &&
     state.winner === null &&
     state.players[state.currentTurnPlayerIndex].isHuman;
 
@@ -469,16 +524,18 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         }}
         className="relative shrink-0"
       >
-        {/* Top-Left Back/Menu Button */}
+        {/* Top-Left Back Button (opens dedicated Exit Confirmation Dialog) */}
         <button
           onClick={() => {
             AudioService.playButtonClick();
             HapticService.uiTap();
-            setShowPauseDialog(true);
+            setShowPauseDialog(false);
+            setShowExitConfirmDialog(true);
           }}
           style={{ left: '90px', top: '60px', width: '68px', height: '68px' }}
           className="absolute rounded-full bg-white border-2 border-[#DAD3F5] flex items-center justify-center hover:scale-105 transition cursor-pointer shadow"
-          title="Game Menu"
+          title="Leave Game"
+          aria-label="Leave Game"
         >
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
             <path
@@ -553,16 +610,18 @@ export const GameScreen: React.FC<GameScreenProps> = ({
           </svg>
         </button>
 
-        {/* Top-Right Settings Button */}
+        {/* Top-Right Settings Button (opens GAME PAUSED panel) */}
         <button
           onClick={() => {
             AudioService.playButtonClick();
             HapticService.uiTap();
+            setShowExitConfirmDialog(false);
             setShowPauseDialog(true);
           }}
           style={{ left: '1762px', top: '60px', width: '68px', height: '68px' }}
           className="absolute rounded-full bg-white border-2 border-[#DAD3F5] flex items-center justify-center hover:scale-105 transition cursor-pointer shadow"
           title="Settings & Controls"
+          aria-label="Settings & Controls"
         >
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="3" stroke="#2A2160" strokeWidth="2.4" />
@@ -704,13 +763,15 @@ export const GameScreen: React.FC<GameScreenProps> = ({
           })}
         </div>
 
-        {/* Sequential Card Exchange Layer */}
+        {/* Sequential Card Exchange Layer (GPU-composited translate3d) */}
         {isAnimatingExchange && animatingDiscardedCard && animatingTakenCard && (
           <div className="absolute inset-0 pointer-events-none">
             <div
               style={{
-                left: `${outgoingPos.x}px`,
-                top: `${outgoingPos.y}px`,
+                left: '0px',
+                top: '0px',
+                transform: `translate3d(${outgoingPos.x}px, ${outgoingPos.y}px, 0)`,
+                willChange: 'transform',
                 zIndex: exchangeProgress >= phase4Start ? 30 : 20,
               }}
               className="absolute"
@@ -725,8 +786,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
             <div
               style={{
-                left: `${incomingPos.x}px`,
-                top: `${incomingPos.y}px`,
+                left: '0px',
+                top: '0px',
+                transform: `translate3d(${incomingPos.x}px, ${incomingPos.y}px, 0)`,
+                willChange: 'transform',
                 zIndex: exchangeProgress < phase4Start ? 30 : 20,
               }}
               className="absolute"
@@ -741,7 +804,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
           </div>
         )}
 
-        {/* Initial Dealing Flying Cards */}
+        {/* Initial Dealing Flying Cards (GPU-composited translate3d) */}
         {isDealing && (
           <div className="absolute inset-0 pointer-events-none">
             {Array.from({ length: state.totalPlayers }).flatMap((_, playerIdx) => {
@@ -764,9 +827,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                   <div
                     key={`${playerIdx}_${c}`}
                     style={{
-                      left: `${x - 34}px`,
-                      top: `${y - 50}px`,
-                      transform: `rotate(${(1 - curvedT) * 22}deg)`,
+                      left: '0px',
+                      top: '0px',
+                      transform: `translate3d(${x - 34}px, ${y - 50}px, 0) rotate(${(1 - curvedT) * 22}deg)`,
+                      willChange: 'transform',
                     }}
                     className="absolute"
                   >
@@ -780,6 +844,16 @@ export const GameScreen: React.FC<GameScreenProps> = ({
       </div>
 
       {/* Overlays */}
+      {showExitConfirmDialog && (
+        <ExitConfirmationDialog
+          onStayInGame={() => setShowExitConfirmDialog(false)}
+          onExitGame={() => {
+            setShowExitConfirmDialog(false);
+            onExitToMainMenu();
+          }}
+        />
+      )}
+
       {showPauseDialog && (
         <GameControlsDialog
           soundEnabled={settings.soundEnabled}

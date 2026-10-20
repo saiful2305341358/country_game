@@ -12,7 +12,7 @@ interface CountryCardViewProps {
   onIllegalTap?: () => void;
 }
 
-export const CountryCardView: React.FC<CountryCardViewProps> = ({
+export const CountryCardView: React.FC<CountryCardViewProps> = React.memo(({
   card,
   isSelected = false,
   isLegal = true,
@@ -420,7 +420,7 @@ export const CountryCardView: React.FC<CountryCardViewProps> = ({
       </div>
     </div>
   );
-};
+});
 
 interface CardBackViewProps {
   width?: number;
@@ -428,7 +428,7 @@ interface CardBackViewProps {
   showStackShadow?: boolean;
 }
 
-export const CardBackView: React.FC<CardBackViewProps> = ({
+export const CardBackView: React.FC<CardBackViewProps> = React.memo(({
   width = 112,
   height,
   showStackShadow = false,
@@ -464,4 +464,4 @@ export const CardBackView: React.FC<CardBackViewProps> = ({
       </svg>
     </div>
   );
-};
+});

@@ -2,66 +2,99 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="120dp"
     android:height="120dp"
-    android:viewportWidth="120"
-    android:viewportHeight="120">
+    android:viewportWidth="256"
+    android:viewportHeight="256">
 
-    <!-- Outer subtle gold halo ring -->
-    <path
-        android:fillColor="#1AFFE082"
-        android:pathData="M60,8 A52,52 0 1,1 59.99,8 Z" />
-
-    <!-- Deep slate circular emblem medallion with gold rim -->
+    <!-- Outer gold & navy medallion crest -->
     <path
         android:fillColor="#0F172A"
-        android:strokeColor="#FFD54F"
-        android:strokeWidth="2.5"
-        android:pathData="M60,14 A46,46 0 1,1 59.99,14 Z" />
+        android:strokeColor="#FFD700"
+        android:strokeWidth="7"
+        android:pathData="M128,10 A118,118 0 1,1 127.99,10 Z" />
 
-    <!-- Inner subtle gold hairline ring -->
+    <!-- Subtle inner compass ring -->
     <path
         android:fillColor="#00000000"
-        android:strokeColor="#4DFFD700"
-        android:strokeWidth="1.0"
-        android:pathData="M60,20 A40,40 0 1,1 59.99,20 Z" />
+        android:strokeColor="#52FFD700"
+        android:strokeWidth="2"
+        android:pathData="M128,23 A105,105 0 1,1 127.99,23 Z" />
 
-    <!-- Left fanned playing card (tilted left) -->
+    <!-- Left fanned card: Saudi Arabia Emerald -->
     <group
-        android:pivotX="60"
-        android:pivotY="66"
-        android:rotation="-14">
+        android:pivotX="128"
+        android:pivotY="148"
+        android:rotation="-22">
         <path
-            android:fillColor="#1E293B"
-            android:strokeColor="#D97706"
-            android:strokeWidth="2.0"
-            android:pathData="M40,32 L68,32 C70.2,32 72,33.8 72,36 L72,76 C72,78.2 70.2,80 68,80 L40,80 C37.8,80 36,78.2 36,76 L36,36 C36,33.8 37.8,32 40,32 Z" />
+            android:fillColor="#059669"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="3"
+            android:pathData="M92,60 L148,60 C153.5,60 158,64.5 158,70 L158,162 C158,167.5 153.5,172 148,172 L92,172 C86.5,172 82,167.5 82,162 L82,70 C82,64.5 86.5,60 92,60 Z" />
     </group>
 
-    <!-- Right fanned playing card (tilted right) -->
+    <!-- Right fanned card: Australia Outback Gold -->
     <group
-        android:pivotX="60"
-        android:pivotY="66"
-        android:rotation="12">
+        android:pivotX="128"
+        android:pivotY="148"
+        android:rotation="22">
         <path
-            android:fillColor="#06281E"
+            android:fillColor="#D97706"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="3"
+            android:pathData="M108,60 L164,60 C169.5,60 174,64.5 174,70 L174,162 C174,167.5 169.5,172 164,172 L108,172 C102.5,172 98,167.5 98,162 L98,70 C98,64.5 102.5,60 108,60 Z" />
+    </group>
+
+    <!-- Upper-Right Accent card: Japan Crimson -->
+    <group
+        android:pivotX="128"
+        android:pivotY="144"
+        android:rotation="8">
+        <path
+            android:fillColor="#E11D48"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="3"
+            android:pathData="M100,48 L156,48 C161.5,48 166,52.5 166,58 L166,150 C166,155.5 161.5,160 156,160 L100,160 C94.5,160 90,155.5 90,150 L90,58 C90,52.5 94.5,48 100,48 Z" />
+    </group>
+
+    <!-- Central Hero Card: GLOBAL Wild Starter Card -->
+    <path
+        android:fillColor="#1E1B4B"
+        android:strokeColor="#FFD700"
+        android:strokeWidth="3.5"
+        android:pathData="M96,54 L160,54 C166.6,54 172,59.4 172,66 L172,174 C172,180.6 166.6,186 160,186 L96,186 C89.4,186 84,180.6 84,174 L84,66 C84,59.4 89.4,54 96,54 Z" />
+
+    <!-- Central Globe Circle inside Hero Card -->
+    <path
+        android:fillColor="#2238BDF8"
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="2.2"
+        android:pathData="M128,93 A25,25 0 1,1 127.99,93 Z" />
+
+    <!-- Equator & Meridian -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#7DD3FC"
+        android:strokeWidth="1.8"
+        android:pathData="M103,118 L153,118 M128,93 L128,143" />
+
+    <!-- Tilted Golden Orbital Ring -->
+    <group
+        android:pivotX="128"
+        android:pivotY="118"
+        android:rotation="-22">
+        <path
+            android:fillColor="#00000000"
             android:strokeColor="#FFD700"
-            android:strokeWidth="2.2"
-            android:pathData="M46,30 L74,30 C76.2,30 78,31.8 78,34 L78,74 C78,76.2 76.2,78 74,78 L46,78 C43.8,78 42,76.2 42,74 L42,34 C42,31.8 43.8,30 46,30 Z" />
+            android:strokeWidth="2.6"
+            android:pathData="M94,118 A34,11 0 1,0 162,118 A34,11 0 1,0 94,118 Z" />
     </group>
 
-    <!-- Center four-pointed championship gold star on front card -->
+    <!-- Bottom Pedestal 4-Pointed Star Crest -->
+    <path
+        android:fillColor="#0F172A"
+        android:strokeColor="#FFD700"
+        android:strokeWidth="2.8"
+        android:pathData="M128,188 A18,18 0 1,1 127.99,188 Z" />
     <path
         android:fillColor="#FFD700"
-        android:pathData="M62,38 L66.2,49.8 L78,54 L66.2,58.2 L62,70 L57.8,58.2 L46,54 L57.8,49.8 Z" />
-
-    <!-- Inner bright core diamond -->
-    <path
-        android:fillColor="#FFF8E1"
-        android:pathData="M62,47 L64.5,51.5 L69,54 L64.5,56.5 L62,61 L59.5,56.5 L55,54 L59.5,51.5 Z" />
-
-    <!-- Bottom gold ribbon bar -->
-    <path
-        android:fillColor="#D97706"
-        android:strokeColor="#FFD54F"
-        android:strokeWidth="1.2"
-        android:pathData="M38,84 L82,84 C84.2,84 86,85.8 86,88 C86,90.2 84.2,92 82,92 L38,92 C35.8,92 34,90.2 34,88 C34,85.8 35.8,84 38,84 Z" />
+        android:pathData="M128,193 L131.8,202.2 L141,206 L131.8,209.8 L128,219 L124.2,209.8 L115,206 L124.2,202.2 Z" />
 </vector>

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/game_logo.dart';
 import '../widgets/player_stats_overlay.dart';
 import 'player_selection_screen.dart';
 import 'settings_screen.dart';
@@ -272,84 +273,7 @@ class MainMenuScreen extends StatelessWidget {
   }
 
   Widget _buildAppLogo({double size = 96}) {
-    final scale = size / 100.0;
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const RadialGradient(
-          colors: [
-            Color(0xFF1E293B),
-            Color(0xFF0F172A),
-          ],
-        ),
-        border: Border.all(
-          color: const Color(0xFFFFD700),
-          width: 2.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFFFD700).withValues(alpha: 0.3),
-            blurRadius: 20,
-            spreadRadius: 2,
-          ),
-        ],
-      ),
-      child: Center(
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Transform.rotate(
-              angle: -0.25,
-              child: Container(
-                width: 32 * scale,
-                height: 50 * scale,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFD97706),
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: const Color(0xFFFFD700), width: 1),
-                ),
-              ),
-            ),
-            Transform.rotate(
-              angle: 0.25,
-              child: Container(
-                width: 32 * scale,
-                height: 50 * scale,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2563EB),
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: const Color(0xFFFFD700), width: 1),
-                ),
-              ),
-            ),
-            Container(
-              width: 34 * scale,
-              height: 54 * scale,
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F172A),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: const Color(0xFFFFD700), width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.5),
-                    blurRadius: 6,
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.public,
-                  color: const Color(0xFF38BDF8),
-                  size: 20 * scale,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    return GameLogo(size: size, withGlow: true);
   }
 
   void _showRulesDialog(BuildContext context) {
@@ -536,9 +460,11 @@ class _BilingualRulesDialogState extends State<BilingualRulesDialog> {
           title: '2. Dynamic Difficulty (Player-Based Set Size)',
           body:
               'The number of cards required to win matches the total number of players at the table (N):\n'
+              '• 3 Players → Collect 3 cards of the same country (9 country cards total)\n'
               '• 4 Players → Collect 4 cards of the same country (16 country cards total)\n'
               '• 5 Players → Collect 5 cards of the same country (25 country cards total)\n'
-              '• 6 Players → Collect 6 cards of the same country (36 country cards total)',
+              '• 6 Players → Collect 6 cards of the same country (36 country cards total)\n'
+              '• 7 Players → Collect 7 cards of the same country (49 country cards total)',
         ),
         _RuleSection(
           icon: Icons.public_outlined,
@@ -573,9 +499,11 @@ class _BilingualRulesDialogState extends State<BilingualRulesDialog> {
           title: '২. গতিশীল চ্যালেঞ্জ (খেলোয়াড় সংখ্যা অনুযায়ী জয়ের শর্ত)',
           body:
               'জয়ের জন্য কয়টি একই দেশের কার্ড লাগবে তা নির্ভর করে মোট খেলোয়াড় সংখ্যার (N) ওপর:\n'
+              '• ৩ জন খেলোয়াড় → একই দেশের ৩টি কার্ড মেলাতে হবে (মোট ৯টি দেশ কার্ড)\n'
               '• ৪ জন খেলোয়াড় → একই দেশের ৪টি কার্ড মেলাতে হবে (মোট ১৬টি দেশ কার্ড)\n'
               '• ৫ জন খেলোয়াড় → একই দেশের ৫টি কার্ড মেলাতে হবে (মোট ২৫টি দেশ কার্ড)\n'
-              '• ৬ জন খেলোয়াড় → একই দেশের ৬টি কার্ড মেলাতে হবে (মোট ৩৬টি দেশ কার্ড)',
+              '• ৬ জন খেলোয়াড় → একই দেশের ৬টি কার্ড মেলাতে হবে (মোট ৩৬টি দেশ কার্ড)\n'
+              '• ৭ জন খেলোয়াড় → একই দেশের ৭টি কার্ড মেলাতে হবে (মোট ৪৯টি দেশ কার্ড)',
         ),
         _RuleSection(
           icon: Icons.public_outlined,

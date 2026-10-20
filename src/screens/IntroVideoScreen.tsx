@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Globe, SkipForward } from 'lucide-react';
+import { SkipForward } from 'lucide-react';
 import { CountryCardView } from '../components/CountryCardView';
+import { GameLogo } from '../components/GameLogo';
 import { CountryType } from '../models/types';
 import { AudioService, HapticService } from '../services/soundSynthesizer';
 
@@ -143,8 +144,8 @@ export const IntroVideoScreen: React.FC<IntroVideoScreenProps> = ({ onFinished }
           style={{ opacity: dealProgress }}
           className="absolute top-[18px] left-0 right-0 flex justify-center z-20"
         >
-          <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#0F172A]/90 border-[1.5px] border-[#FFD54F]/85 shadow-lg">
-            <Globe size={18} className="text-[#FFD54F]" />
+          <div className="flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-[#0F172A]/90 border-[1.5px] border-[#FFD54F]/85 shadow-lg">
+            <GameLogo size={26} withGlow={false} />
             <span className="text-[#FFD700] text-base font-black tracking-[2.2px]">
               COUNTRY GAME
             </span>

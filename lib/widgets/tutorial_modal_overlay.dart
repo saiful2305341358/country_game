@@ -183,7 +183,7 @@ class TutorialModalOverlay extends StatelessWidget {
                               accentColor: const Color(0xFF60A5FA),
                               title: 'Different Country Swap Rule',
                               description:
-                                  'You must play a different country than the card currently on the table. The special Starting Card can always be swapped.',
+                                  'You must play a different country than the card currently on the table. The special \'GLOBAL\' Starting Card can always be swapped.',
                             ),
                             const SizedBox(height: 6),
 
@@ -195,7 +195,7 @@ class TutorialModalOverlay extends StatelessWidget {
                               title:
                                   'Collect $targetSetSize Matching Country Cards to Win',
                               description:
-                                  'Collect all $targetSetSize cards of the same country in your hand (excluding the Starting Card) to immediately win the round!',
+                                  'Collect all $targetSetSize cards of the same country in your hand (excluding the \'GLOBAL\' Starting Card) to immediately win the round!',
                             ),
                           ],
                         ),

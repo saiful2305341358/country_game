@@ -33,6 +33,7 @@ class _FanSlot {
 class PlayingTable extends StatefulWidget {
   final GameState state;
   final ValueChanged<GameCard> onCardSelected;
+  final VoidCallback? onBack;
   final VoidCallback onPause;
   final VoidCallback? onShowStats;
   final VoidCallback? onShowTutorial;
@@ -47,6 +48,7 @@ class PlayingTable extends StatefulWidget {
     super.key,
     required this.state,
     required this.onCardSelected,
+    this.onBack,
     required this.onPause,
     this.onShowStats,
     this.onShowTutorial,
@@ -435,15 +437,15 @@ class _PlayingTableState extends State<PlayingTable>
                   child: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    // 1. Top-Left Back/Menu Button (.btn at left: 90px, top: 60px)
+                    // 1. Top-Left Back Button (opens dedicated Exit Confirmation Dialog)
                     Positioned(
                       left: 90,
                       top: 60,
                       width: 68,
                       height: 68,
                       child: _buildCircleButton(
-                        tooltip: 'Game Menu',
-                        onTap: widget.onPause,
+                        tooltip: 'Leave Game',
+                        onTap: widget.onBack ?? widget.onPause,
                         child: const CustomPaint(
                           size: Size(30, 30),
                           painter: _BackChevronIconPainter(),

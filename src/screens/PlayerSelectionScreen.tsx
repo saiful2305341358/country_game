@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Globe, Play, Shuffle } from 'lucide-react';
 import { CountryCardView } from '../components/CountryCardView';
+import { GameLogo } from '../components/GameLogo';
 import { selectActiveTypes } from '../game/gameLogic';
 import { COUNTRY_METADATA, CountryType } from '../models/types';
 import { AudioService, HapticService } from '../services/soundSynthesizer';
@@ -64,6 +65,7 @@ export const PlayerSelectionScreen: React.FC<PlayerSelectionScreenProps> = ({
 
           <div className="text-center">
             <div className="flex items-center justify-center gap-2.5 flex-wrap">
+              <GameLogo size={26} withGlow={false} />
               <span className="text-[#FFD700] text-base sm:text-[17px] font-black tracking-wider">
                 Select Players
               </span>
@@ -134,14 +136,14 @@ export const PlayerSelectionScreen: React.FC<PlayerSelectionScreenProps> = ({
           </button>
         </div>
 
-        {/* 4. Country Card Preview Stage */}
-        <div className="min-h-[132px] sm:min-h-[148px] flex items-center justify-center gap-3 overflow-x-auto py-1">
+        {/* 4. Country Card Preview Stage (Fixed height so 3..7 players never shifts START GAME) */}
+        <div className="h-[126px] sm:h-[144px] flex items-center justify-center gap-2 sm:gap-3 overflow-x-auto py-1">
           {activeTypes.map((type) => (
             <div key={type} className="flex flex-col items-center gap-1 shrink-0">
               <CountryCardView
                 card={{ id: `preview_${type}`, type, isStartingCard: false }}
-                width={52}
-                height={104}
+                width={50}
+                height={100}
               />
               <span className="text-[#FFE082] text-[9.5px] font-bold">
                 {COUNTRY_METADATA[type].shortCode}

@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="512" height="512">
+  <defs>
+    <radialGradient id="ccg_medallion_bg" cx="50%" cy="38%" r="65%">
+      <stop offset="0%" stop-color="#1E293B" />
+      <stop offset="58%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#060D1A" />
+    </radialGradient>
+    <linearGradient id="ccg_gold_rim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF59D" />
+      <stop offset="35%" stop-color="#FFD700" />
+      <stop offset="70%" stop-color="#D97706" />
+      <stop offset="100%" stop-color="#F59E0B" />
+    </linearGradient>
+    <linearGradient id="ccg_card_sau" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#064E3B" />
+    </linearGradient>
+    <linearGradient id="ccg_card_aus" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#78350F" />
+    </linearGradient>
+    <linearGradient id="ccg_card_jpn" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F43F5E" />
+      <stop offset="100%" stop-color="#881337" />
+    </linearGradient>
+    <linearGradient id="ccg_card_global" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="52%" stop-color="#1E1B4B" />
+      <stop offset="100%" stop-color="#042F2E" />
+    </linearGradient>
+    <radialGradient id="ccg_globe_glow" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.42" />
+      <stop offset="70%" stop-color="#0284C7" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#0284C7" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <circle cx="128" cy="128" r="118" fill="url(#ccg_medallion_bg)" stroke="url(#ccg_gold_rim)" stroke-width="7" />
+  <circle cx="128" cy="128" r="105" fill="none" stroke="#FFD700" stroke-opacity="0.32" stroke-width="1.8" stroke-dasharray="6 6" />
+
+  <g transform="translate(128 148) rotate(-22) translate(-46 -88)">
+    <rect x="0" y="0" width="76" height="112" rx="10" fill="url(#ccg_card_sau)" stroke="#FFFFFF" stroke-width="3" />
+    <rect x="24" y="34" width="28" height="28" fill="none" stroke="#6EE7B7" stroke-opacity="0.85" stroke-width="2" />
+    <rect x="24" y="34" width="28" height="28" fill="none" stroke="#6EE7B7" stroke-opacity="0.85" stroke-width="2" transform="rotate(45 38 48)" />
+  </g>
+
+  <g transform="translate(128 148) rotate(22) translate(-30 -88)">
+    <rect x="0" y="0" width="76" height="112" rx="10" fill="url(#ccg_card_aus)" stroke="#FFFFFF" stroke-width="3" />
+    <polygon points="38,28 43,40 56,38 47,48 53,60 40,55 38,67 36,55 23,60 29,48 20,38 33,40" fill="#FDE68A" fill-opacity="0.35" stroke="#FDE68A" stroke-width="1.8" stroke-linejoin="round" />
+  </g>
+
+  <g transform="translate(128 144) rotate(8) translate(-38 -96)">
+    <rect x="0" y="0" width="76" height="112" rx="10" fill="url(#ccg_card_jpn)" stroke="#FFFFFF" stroke-width="3" />
+    <circle cx="38" cy="46" r="16" fill="#FDA4AF" fill-opacity="0.4" stroke="#FFE4E6" stroke-width="2" />
+  </g>
+
+  <g transform="translate(84 54)">
+    <rect x="0" y="0" width="88" height="132" rx="12" fill="url(#ccg_card_global)" stroke="url(#ccg_gold_rim)" stroke-width="3.5" />
+    <circle cx="44" cy="64" r="31" fill="url(#ccg_globe_glow)" />
+    <circle cx="44" cy="64" r="25" fill="none" stroke="#38BDF8" stroke-width="2.2" />
+    <ellipse cx="44" cy="64" rx="13" ry="25" fill="none" stroke="#7DD3FC" stroke-opacity="0.78" stroke-width="1.6" />
+    <line x1="19" y1="64" x2="69" y2="64" stroke="#38BDF8" stroke-width="1.8" />
+    <ellipse cx="44" cy="64" rx="34" ry="11" fill="none" stroke="url(#ccg_gold_rim)" stroke-width="2.6" transform="rotate(-22 44 64)" />
+    <circle cx="74" cy="52" r="3.8" fill="#FFF59D" stroke="#D97706" stroke-width="1.2" />
+    <circle cx="14" cy="76" r="3.2" fill="#FFD700" />
+  </g>
+
+  <g transform="translate(128 206)">
+    <circle cx="0" cy="0" r="18" fill="#0F172A" stroke="url(#ccg_gold_rim)" stroke-width="2.8" />
+    <polygon points="0,-13 3.8,-3.8 13,0 3.8,3.8 0,13 -3.8,3.8 -13,0 -3.8,-3.8" fill="url(#ccg_gold_rim)" />
+    <circle cx="0" cy="0" r="2.8" fill="#FFFFFF" />
+  </g>
+</svg>

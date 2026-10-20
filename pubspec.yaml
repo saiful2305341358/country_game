@@ -1,5 +1,5 @@
 name: country_game
-description: "A new Flutter project."
+description: "Country Card Game — A fast-paced landscape card-trading strategy game for 3 to 7 players."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev

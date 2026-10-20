@@ -307,6 +307,47 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
+  void _showExitConfirmationDialog() {
+    AudioService.instance.playButtonClick();
+    HapticService.instance.uiTap();
+    _engine.pauseActivePlay();
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss Leave Game Dialog',
+      barrierColor: Colors.black.withValues(alpha: 0.65),
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (dialogContext, _, __) => ExitConfirmationDialog(
+        onStayInGame: () {
+          Navigator.pop(dialogContext);
+        },
+        onExitGame: () {
+          Navigator.pop(dialogContext);
+          _engine.leaveGame();
+          Navigator.pop(context);
+        },
+      ),
+      transitionBuilder: (context, anim, _, child) {
+        final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        return FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.92, end: 1.0).animate(curved),
+            child: child,
+          ),
+        );
+      },
+    ).then((_) {
+      if (mounted &&
+          !_isDealing &&
+          !_showStatsOverlay &&
+          !_tutorialPausedEngine &&
+          _engine.state?.isGameOver != true) {
+        _engine.resumeActivePlay();
+      }
+    });
+  }
+
   void _showPauseDialog() {
     AudioService.instance.playButtonClick();
     HapticService.instance.uiTap();
@@ -383,24 +424,31 @@ class _GameScreenState extends State<GameScreen>
         state.winner != null &&
         state.winningType != null;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFBFE3A5),
-      body: Stack(
-        children: [
-          // 1. Main Horizontal Playing Table with localized Dealing & Sequential Exchange Animation layers
-          PlayingTable(
-            state: state,
-            isProcessingMove: _engine.isProcessingMove,
-            isDealing: _isDealing,
-            dealingProgress: _dealingController.value,
-            dealingAnimation: _dealingController,
-            animationsEnabled: GameSettings.current.animationsEnabled,
-            onCardSelected: _onCardSelected,
-            onExchangeAnimationComplete: _onExchangeAnimationComplete,
-            onPause: _showPauseDialog,
-            onShowStats: _openStatsOverlay,
-            onShowTutorial: _openTutorialOverlay,
-          ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _showExitConfirmationDialog();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFBFE3A5),
+        body: Stack(
+          children: [
+            // 1. Main Horizontal Playing Table with localized Dealing & Sequential Exchange Animation layers
+            PlayingTable(
+              state: state,
+              isProcessingMove: _engine.isProcessingMove,
+              isDealing: _isDealing,
+              dealingProgress: _dealingController.value,
+              dealingAnimation: _dealingController,
+              animationsEnabled: GameSettings.current.animationsEnabled,
+              onCardSelected: _onCardSelected,
+              onExchangeAnimationComplete: _onExchangeAnimationComplete,
+              onBack: _showExitConfirmationDialog,
+              onPause: _showPauseDialog,
+              onShowStats: _openStatsOverlay,
+              onShowTutorial: _openTutorialOverlay,
+            ),
 
           // 2. Victory Overlay (shown once the winning exchange animation finishes)
           if (showVictoryModal && !_showStatsOverlay && !_showTutorialOverlay)
@@ -453,7 +501,8 @@ class _GameScreenState extends State<GameScreen>
                 triggerKey: _celebrationTriggerKey,
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }

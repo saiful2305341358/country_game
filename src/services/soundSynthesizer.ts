@@ -1,5 +1,8 @@
-// Procedural 16-bit 22050Hz PCM WAV synthesizer & Audio/Haptic services
+// Procedural 16-bit 22050Hz PCM WAV synthesizer & Audio/Haptic/Settings services
 // Faithfully ported from lib/services/sound_synthesizer.dart, audio_service_web.dart, and haptic_service_web.dart
+// Optimized with lazy per-key WAV synthesis, immediate mute/stopAll, and visibilitychange lifecycle handling.
+
+import { DEFAULT_GAME_SETTINGS, GameSettings } from '../models/types';
 
 const SAMPLE_RATE = 22050;
 
@@ -198,11 +201,13 @@ function generateChimeWav(freqs: number[], stepDurationMs: number, volume: numbe
 }
 
 function uint8ToDataUri(bytes: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  const chunkSize = 0x8000;
+  const chunks: string[] = [];
+  for (let i = 0; i < bytes.byteLength; i += chunkSize) {
+    const sub = bytes.subarray(i, Math.min(i + chunkSize, bytes.byteLength));
+    chunks.push(String.fromCharCode.apply(null, Array.from(sub)));
   }
-  return `data:audio/wav;base64,${btoa(binary)}`;
+  return `data:audio/wav;base64,${btoa(chunks.join(''))}`;
 }
 
 class SoundPool {
@@ -223,11 +228,34 @@ class SoundPool {
     this.cursor = (this.cursor + 1) % this.elements.length;
     return el;
   }
+
+  stopAll(): void {
+    for (const el of this.elements) {
+      try {
+        if (!el.paused) {
+          el.pause();
+          el.currentTime = 0;
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
 }
+
+type SoundKey =
+  | 'cardTap'
+  | 'cardPlace'
+  | 'cardTake'
+  | 'exchange'
+  | 'buttonClick'
+  | 'gameStart'
+  | 'gameEnd'
+  | 'victory';
 
 class AudioServiceImpl {
   private _soundEnabled = true;
-  private pools: Record<string, SoundPool> = {};
+  private pools: Partial<Record<SoundKey, SoundPool>> = {};
 
   constructor() {
     try {
@@ -238,28 +266,65 @@ class AudioServiceImpl {
     } catch {
       // ignore
     }
-    this.initPools();
+
+    // Warm up sound pools during browser idle time after initial paint
+    if (typeof window !== 'undefined') {
+      const warmup = () => {
+        try {
+          this.getOrCreatePool('buttonClick');
+          this.getOrCreatePool('cardTap');
+          this.getOrCreatePool('cardPlace');
+          this.getOrCreatePool('cardTake');
+        } catch {
+          // ignore
+        }
+      };
+      if ('requestIdleCallback' in window) {
+        (window as unknown as { requestIdleCallback: (cb: () => void) => void }).requestIdleCallback(warmup);
+      } else {
+        setTimeout(warmup, 250);
+      }
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          this.stopAll();
+        }
+      });
+    }
   }
 
-  private initPools() {
-    try {
-      const wavMap: Record<string, Uint8Array> = {
-        cardTap: generatePhysicalCardFlickWav(30, 175.0, 0.52),
-        cardPlace: generatePhysicalCardPlaceWav(44, 138.0, 0.58),
-        cardTake: generatePhysicalCardSlideWav(56, 0.48),
-        exchange: generatePhysicalDealRiffleWav(4, 55, 0.46),
-        buttonClick: generateUiClickWav(22, 0.45),
-        gameStart: generateChimeWav([523.25, 659.25, 783.99], 70, 0.48),
-        gameEnd: generateChimeWav([392.0, 329.63, 261.63], 95, 0.5),
-        victory: generateChimeWav([523.25, 659.25, 783.99, 1046.5], 85, 0.56),
-      };
+  private synthesizeBytes(key: SoundKey): Uint8Array {
+    switch (key) {
+      case 'cardTap':
+        return generatePhysicalCardFlickWav(30, 175.0, 0.52);
+      case 'cardPlace':
+        return generatePhysicalCardPlaceWav(44, 138.0, 0.58);
+      case 'cardTake':
+        return generatePhysicalCardSlideWav(56, 0.48);
+      case 'exchange':
+        return generatePhysicalDealRiffleWav(4, 55, 0.46);
+      case 'buttonClick':
+        return generateUiClickWav(22, 0.45);
+      case 'gameStart':
+        return generateChimeWav([523.25, 659.25, 783.99], 70, 0.48);
+      case 'gameEnd':
+        return generateChimeWav([392.0, 329.63, 261.63], 95, 0.5);
+      case 'victory':
+        return generateChimeWav([523.25, 659.25, 783.99, 1046.5], 85, 0.56);
+    }
+  }
 
-      for (const [key, bytes] of Object.entries(wavMap)) {
-        const isFrequent = key === 'cardTap' || key === 'cardPlace' || key === 'cardTake';
-        this.pools[key] = new SoundPool(uint8ToDataUri(bytes), isFrequent ? 4 : 2);
-      }
+  private getOrCreatePool(key: SoundKey): SoundPool | null {
+    const existing = this.pools[key];
+    if (existing) return existing;
+    try {
+      const bytes = this.synthesizeBytes(key);
+      const isFrequent = key === 'cardTap' || key === 'cardPlace' || key === 'cardTake';
+      const pool = new SoundPool(uint8ToDataUri(bytes), isFrequent ? 3 : 2);
+      this.pools[key] = pool;
+      return pool;
     } catch {
-      // ignore
+      return null;
     }
   }
 
@@ -269,6 +334,9 @@ class AudioServiceImpl {
 
   set isSoundEnabled(enabled: boolean) {
     this._soundEnabled = enabled;
+    if (!enabled) {
+      this.stopAll();
+    }
     try {
       window.localStorage.setItem('country_game_sound_enabled', String(enabled));
     } catch {
@@ -276,9 +344,16 @@ class AudioServiceImpl {
     }
   }
 
-  private playSound(key: string) {
+  stopAll(): void {
+    for (const pool of Object.values(this.pools)) {
+      pool?.stopAll();
+    }
+  }
+
+  private playSound(key: SoundKey) {
     if (!this._soundEnabled) return;
-    const pool = this.pools[key];
+    if (typeof document !== 'undefined' && document.hidden) return;
+    const pool = this.getOrCreatePool(key);
     if (!pool) return;
     try {
       const audio = pool.next();
@@ -336,6 +411,15 @@ class HapticServiceImpl {
 
   set isHapticsEnabled(enabled: boolean) {
     this._hapticsEnabled = enabled;
+    if (!enabled) {
+      try {
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate(0);
+        }
+      } catch {
+        // ignore
+      }
+    }
     try {
       window.localStorage.setItem('country_game_haptics_enabled', String(enabled));
     } catch {
@@ -345,6 +429,7 @@ class HapticServiceImpl {
 
   private vibrate(pattern: number | number[]) {
     if (!this._hapticsEnabled) return;
+    if (typeof document !== 'undefined' && document.hidden) return;
     try {
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate(pattern);
@@ -385,3 +470,42 @@ class HapticServiceImpl {
 
 export const AudioService = new AudioServiceImpl();
 export const HapticService = new HapticServiceImpl();
+
+export function loadPersistedSettings(): GameSettings {
+  let animationsEnabled = DEFAULT_GAME_SETTINGS.animationsEnabled;
+  let botDelayMs = DEFAULT_GAME_SETTINGS.botDelayMs;
+  try {
+    const savedAnim = window.localStorage.getItem('country_game_animations_enabled');
+    if (savedAnim !== null) {
+      animationsEnabled = savedAnim === 'true';
+    }
+    const savedDelay = window.localStorage.getItem('country_game_bot_delay_ms');
+    if (savedDelay !== null) {
+      const parsed = parseInt(savedDelay, 10);
+      if (!Number.isNaN(parsed) && parsed >= 500 && parsed <= 5000) {
+        botDelayMs = parsed;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return {
+    ...DEFAULT_GAME_SETTINGS,
+    soundEnabled: AudioService.isSoundEnabled,
+    hapticsEnabled: HapticService.isHapticsEnabled,
+    animationsEnabled,
+    botDelayMs,
+  };
+}
+
+export function savePersistedSettings(settings: GameSettings): void {
+  try {
+    window.localStorage.setItem(
+      'country_game_animations_enabled',
+      String(settings.animationsEnabled)
+    );
+    window.localStorage.setItem('country_game_bot_delay_ms', String(settings.botDelayMs));
+  } catch {
+    // ignore
+  }
+}

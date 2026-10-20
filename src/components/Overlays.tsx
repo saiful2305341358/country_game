@@ -8,6 +8,7 @@ import {
   HelpCircle,
   Home,
   Lightbulb,
+  LogOut,
   PauseCircle,
   Play,
   RefreshCw,
@@ -51,7 +52,7 @@ export const BilingualRulesDialog: React.FC<{ onClose: () => void }> = ({ onClos
     {
       icon: <Users size={18} className="text-[#FFD54F] shrink-0" />,
       title: '2. Dynamic Difficulty (Player-Based Set Size)',
-      body: 'The number of cards required to win matches the total number of players at the table (N):\n• 3 Players → Collect 3 cards of the same country (9 country cards total)\n• 4 Players → Collect 4 cards of the same country (16 country cards total)\n• 5 Players → Collect 5 cards of the same country (25 country cards total)\n• 6 Players → Collect 6 cards of the same country (36 country cards total)',
+      body: 'The number of cards required to win matches the total number of players at the table (N):\n• 3 Players → Collect 3 cards of the same country (9 country cards total)\n• 4 Players → Collect 4 cards of the same country (16 country cards total)\n• 5 Players → Collect 5 cards of the same country (25 country cards total)\n• 6 Players → Collect 6 cards of the same country (36 country cards total)\n• 7 Players → Collect 7 cards of the same country (49 country cards total)',
     },
     {
       icon: <Globe size={18} className="text-[#FFD54F] shrink-0" />,
@@ -74,7 +75,7 @@ export const BilingualRulesDialog: React.FC<{ onClose: () => void }> = ({ onClos
     {
       icon: <Users size={18} className="text-[#FFD54F] shrink-0" />,
       title: '২. গতিশীল চ্যালেঞ্জ (খেলোয়াড় সংখ্যা অনুযায়ী জয়ের শর্ত)',
-      body: 'জয়ের জন্য কয়টি একই দেশের কার্ড লাগবে তা নির্ভর করে মোট খেলোয়াড় সংখ্যার (N) ওপর:\n• ৩ জন খেলোয়াড় → একই দেশের ৩টি কার্ড মেলাতে হবে\n• ৪ জন খেলোয়াড় → একই দেশের ৪টি কার্ড মেলাতে হবে (মোট ১৬টি দেশ কার্ড)\n• ৫ জন খেলোয়াড় → একই দেশের ৫টি কার্ড মেলাতে হবে (মোট ২৫টি দেশ কার্ড)\n• ৬ জন খেলোয়াড় → একই দেশের ৬টি কার্ড মেলাতে হবে (মোট ৩৬টি দেশ কার্ড)',
+      body: 'জয়ের জন্য কয়টি একই দেশের কার্ড লাগবে তা নির্ভর করে মোট খেলোয়াড় সংখ্যার (N) ওপর:\n• ৩ জন খেলোয়াড় → একই দেশের ৩টি কার্ড মেলাতে হবে (মোট ৯টি দেশ কার্ড)\n• ৪ জন খেলোয়াড় → একই দেশের ৪টি কার্ড মেলাতে হবে (মোট ১৬টি দেশ কার্ড)\n• ৫ জন খেলোয়াড় → একই দেশের ৫টি কার্ড মেলাতে হবে (মোট ২৫টি দেশ কার্ড)\n• ৬ জন খেলোয়াড় → একই দেশের ৬টি কার্ড মেলাতে হবে (মোট ৩৬টি দেশ কার্ড)\n• ৭ জন খেলোয়াড় → একই দেশের ৭টি কার্ড মেলাতে হবে (মোট ৪৯টি দেশ কার্ড)',
     },
     {
       icon: <Globe size={18} className="text-[#FFD54F] shrink-0" />,
@@ -93,11 +94,11 @@ export const BilingualRulesDialog: React.FC<{ onClose: () => void }> = ({ onClos
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-2.5 sm:p-4"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[680px] max-h-[90vh] bg-[#0F172A] border-[1.4px] border-[#D4AF37] rounded-[18px] p-4 sm:p-5 flex flex-col shadow-2xl"
+        className="w-full max-w-[680px] max-h-[92%] bg-[#0F172A] border-[1.4px] border-[#D4AF37] rounded-[18px] p-3.5 sm:p-5 flex flex-col shadow-2xl"
       >
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -198,11 +199,11 @@ export const PlayerStatsOverlay: React.FC<{
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-3 sm:p-5"
+      className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-2.5 sm:p-5"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[660px] max-h-[90vh] bg-[#0F172A]/95 border-2 border-[#FFD700] rounded-[20px] p-3.5 sm:p-4 flex flex-col shadow-[0_0_28px_rgba(255,215,0,0.3)]"
+        className="w-full max-w-[660px] max-h-[92%] bg-[#0F172A]/95 border-2 border-[#FFD700] rounded-[20px] p-3 sm:p-4 flex flex-col shadow-[0_0_28px_rgba(255,215,0,0.3)]"
       >
         {/* Header */}
         <div className="flex items-center justify-between gap-2">
@@ -430,28 +431,28 @@ export const TutorialModalOverlay: React.FC<{
       icon: <Layers size={14} className="text-[#60A5FA]" />,
       accent: '#60A5FA',
       title: 'Different Country Swap Rule',
-      desc: 'You must play a different country than the card currently on the table. The special Starting Card can always be swapped.',
+      desc: "You must play a different country than the card currently on the table. The special 'GLOBAL' Starting Card can always be swapped.",
     },
     {
       num: '3',
       icon: <Trophy size={14} className="text-[#FFD54F]" />,
       accent: '#FFD54F',
       title: `Collect ${targetSetSize} Matching Country Cards to Win`,
-      desc: `Collect all ${targetSetSize} cards of the same country in your hand (excluding the Starting Card) to immediately win the round!`,
+      desc: `Collect all ${targetSetSize} cards of the same country in your hand (excluding the 'GLOBAL' Starting Card) to immediately win the round!`,
     },
   ];
 
   return (
     <div
       onClick={handleDismiss}
-      className="fixed inset-0 z-50 bg-black/55 flex items-center justify-center p-3"
+      className="fixed inset-0 z-50 bg-black/55 flex items-center justify-center p-2.5 sm:p-3"
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           background: 'linear-gradient(135deg, rgba(15,41,30,0.96), rgba(9,27,20,0.97), rgba(7,19,14,0.98))',
         }}
-        className="w-full max-w-[560px] rounded-[18px] border-[1.5px] border-[#FFD54F]/80 p-4 shadow-2xl"
+        className="w-full max-w-[560px] max-h-[92%] overflow-y-auto rounded-[18px] border-[1.5px] border-[#FFD54F]/80 p-3 sm:p-4 shadow-2xl"
       >
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
@@ -545,16 +546,20 @@ export const GameControlsDialog: React.FC<{
   const [confirmMainMenu, setConfirmMainMenu] = useState(false);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-      <div className="w-full max-w-[540px] bg-[#0F172A]/96 border-[1.5px] border-[#D4AF37] rounded-[18px] p-5 shadow-2xl">
-        <div className="flex items-center justify-center gap-2 mb-3.5">
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-2.5 sm:p-4">
+      <div className="w-full max-w-[540px] max-h-[92%] overflow-y-auto bg-[#0F172A]/96 border-[1.5px] border-[#D4AF37] rounded-[18px] p-4 sm:p-5 shadow-2xl">
+        <div className="flex items-center justify-center gap-2 mb-3">
           <PauseCircle size={25} className="text-[#FFD54F]" />
           <span className="text-[#FFE082] text-lg font-black tracking-widest">GAME PAUSED</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5 mb-3.5">
+        <div className="grid grid-cols-2 gap-2.5 mb-3">
           <button
-            onClick={() => onSoundToggle(!soundEnabled)}
+            onClick={() => {
+              const next = !soundEnabled;
+              HapticService.uiTap();
+              onSoundToggle(next);
+            }}
             className="flex items-center justify-between px-3 py-2.5 rounded-[10px] bg-white/[0.06] hover:bg-white/[0.1] cursor-pointer"
           >
             <div className="flex items-center gap-2 text-white text-xs font-semibold">
@@ -575,7 +580,14 @@ export const GameControlsDialog: React.FC<{
           </button>
 
           <button
-            onClick={() => onHapticsToggle(!hapticsEnabled)}
+            onClick={() => {
+              const next = !hapticsEnabled;
+              AudioService.playButtonClick();
+              onHapticsToggle(next);
+              if (next) {
+                HapticService.cardTap();
+              }
+            }}
             className="flex items-center justify-between px-3 py-2.5 rounded-[10px] bg-white/[0.06] hover:bg-white/[0.1] cursor-pointer"
           >
             <div className="flex items-center gap-2 text-white text-xs font-semibold">
@@ -683,6 +695,128 @@ export const GameControlsDialog: React.FC<{
   );
 };
 
+// 4b. Dedicated Lightweight Exit Confirmation Dialog (Back Button Only)
+export const ExitConfirmationDialog: React.FC<{
+  onStayInGame: () => void;
+  onExitGame: () => void;
+}> = ({ onStayInGame, onExitGame }) => {
+  const [entered, setEntered] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setEntered(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  const handleStay = () => {
+    if (isExiting || isClosing) return;
+    AudioService.playButtonClick();
+    HapticService.uiTap();
+    setIsClosing(true);
+    window.setTimeout(() => {
+      onStayInGame();
+    }, 180);
+  };
+
+  const handleExit = () => {
+    if (isExiting || isClosing) return;
+    setIsExiting(true);
+    AudioService.playButtonClick();
+    HapticService.uiTap();
+    setIsClosing(true);
+    window.setTimeout(() => {
+      onExitGame();
+    }, 150);
+  };
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isExiting && !isClosing) {
+        e.preventDefault();
+        handleStay();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isExiting, isClosing]);
+
+  const isVisible = entered && !isClosing;
+
+  return (
+    <div
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="exit-dialog-title"
+      aria-describedby="exit-dialog-desc"
+      onClick={handleStay}
+      className={`fixed inset-0 z-50 bg-black/65 backdrop-blur-[2px] flex items-center justify-center p-4 transition-opacity duration-200 ${
+        isVisible ? 'opacity-100' : 'opacity-0'
+      }`}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          transform: isVisible ? 'scale(1) translateY(0px)' : 'scale(0.92) translateY(10px)',
+          transition: 'transform 200ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease-out',
+          boxShadow:
+            '0 18px 40px rgba(0, 0, 0, 0.72), 0 0 24px rgba(212, 175, 55, 0.18)',
+        }}
+        className="w-full max-w-[400px] max-h-[92%] overflow-y-auto bg-[#0F172A]/96 border-[1.5px] border-[#D4AF37]/85 rounded-[18px] p-4 sm:p-5"
+      >
+        {/* Header with tasteful Exit icon */}
+        <div className="flex items-center gap-3 mb-2.5">
+          <div className="w-10 h-10 rounded-full bg-[#D97706]/15 border border-[#FFD54F]/50 flex items-center justify-center shrink-0">
+            <LogOut size={19} className="text-[#FFD54F] -scale-x-100" />
+          </div>
+          <div>
+            <h2
+              id="exit-dialog-title"
+              className="text-[#FFE082] text-base sm:text-[17px] font-black tracking-wide leading-tight"
+            >
+              Leave Game?
+            </h2>
+            <span className="text-white/55 text-[10.5px] font-semibold">
+              Match in Progress
+            </span>
+          </div>
+        </div>
+
+        {/* Concise Confirmation Message */}
+        <p
+          id="exit-dialog-desc"
+          className="text-white/85 text-xs sm:text-[13px] leading-relaxed mb-4"
+        >
+          Are you sure you want to leave this match? Your current game progress may be lost.
+        </p>
+
+        {/* Two Clear Actions: Stay in Game (Primary Safe) & Exit Game (Cautionary Secondary) */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            disabled={isExiting || isClosing}
+            onClick={handleStay}
+            className="py-2.5 px-3 rounded-[10px] bg-[#059669] hover:bg-[#047857] disabled:opacity-60 text-white text-xs sm:text-[13px] font-bold flex items-center justify-center gap-1.5 shadow transition cursor-pointer"
+          >
+            <Play size={15} />
+            Stay in Game
+          </button>
+
+          <button
+            type="button"
+            disabled={isExiting || isClosing}
+            onClick={handleExit}
+            className="py-2.5 px-3 rounded-[10px] border border-[#F59E0B]/65 bg-[#D97706]/15 hover:bg-[#D97706]/28 disabled:opacity-60 text-[#FFE082] text-xs sm:text-[13px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+          >
+            <LogOut size={15} className="-scale-x-100" />
+            Exit Game
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // 5. Victory Overlay + Celebration Particles
 export const CelebrationParticlesCanvas: React.FC<{
   completedType: CountryType;
@@ -693,6 +827,12 @@ export const CelebrationParticlesCanvas: React.FC<{
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    ) {
+      return;
+    }
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -723,45 +863,55 @@ export const CelebrationParticlesCanvas: React.FC<{
       gravity: number;
     }
 
+    // Use a lightweight particle budget (56 particles) for smooth 60fps on low-end Android GPUs
+    const particleCount = 56;
     const particles: Particle[] = [];
-    for (let i = 0; i < 90; i++) {
+    for (let i = 0; i < particleCount; i++) {
       const a = Math.random() * Math.PI * 2;
-      const speed = 160 + Math.random() * 480;
+      const speed = 160 + Math.random() * 440;
       particles.push({
         ox: originNormalized.x,
         oy: originNormalized.y,
         vx: Math.cos(a) * speed,
         vy: Math.sin(a) * speed - 130,
         color: palette[Math.floor(Math.random() * palette.length)],
-        size: 7 + Math.random() * 8,
+        size: 7 + Math.random() * 7,
         angle: Math.random() * Math.PI * 2,
         angVel: (Math.random() - 0.5) * 12,
-        delay: Math.random() * 0.15,
-        life: 0.75 + Math.random() * 0.25,
+        delay: Math.random() * 0.14,
+        life: 0.72 + Math.random() * 0.25,
         gravity: 420,
       });
     }
 
     let animId = 0;
     const start = performance.now();
-    const duration = 3400;
+    const duration = 3100;
 
     const render = (now: number) => {
       const progress = (now - start) / duration;
-      if (progress >= 1) return;
+      if (progress >= 1) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+      }
 
-      const w = (canvas.width = canvas.clientWidth);
-      const h = (canvas.height = canvas.clientHeight);
-      ctx.clearRect(0, 0, w, h);
+      // Only resize canvas backing buffer if dimensions changed to avoid 60Hz GPU buffer reallocation
+      const cw = canvas.clientWidth;
+      const ch = canvas.clientHeight;
+      if (canvas.width !== cw || canvas.height !== ch) {
+        canvas.width = cw;
+        canvas.height = ch;
+      }
+      ctx.clearRect(0, 0, cw, ch);
 
       for (const p of particles) {
         if (progress < p.delay) continue;
         const localT = (progress - p.delay) / p.life;
         if (localT <= 0 || localT >= 1) continue;
-        const dt = localT * p.life * 3.4;
+        const dt = localT * p.life * 3.1;
         const dragFactor = (1 - Math.exp(-1.6 * dt)) / 1.6;
-        const x = p.ox * w + p.vx * dragFactor;
-        const y = p.oy * h + p.vy * dragFactor + 0.5 * p.gravity * dt * dt;
+        const x = p.ox * cw + p.vx * dragFactor;
+        const y = p.oy * ch + p.vy * dragFactor + 0.5 * p.gravity * dt * dt;
         const alpha = Math.min(1, localT / 0.1) * Math.min(1, (1 - localT) / 0.28);
 
         ctx.save();
@@ -802,7 +952,7 @@ export const VictoryOverlay: React.FC<{
 }) => {
   const isHuman = winner.isHuman;
   const meta = COUNTRY_METADATA[winningType];
-  const cardWidth = totalPlayers >= 6 ? 42 : totalPlayers === 5 ? 46 : 50;
+  const cardWidth = totalPlayers >= 6 ? 40 : totalPlayers === 5 ? 44 : 48;
 
   const { setBonus, speedBonus, roundPoints } = computeRoundPoints(totalPlayers, turnCount);
   const winnerRecord = StatsService.getRecordForPlayer(winner);
@@ -842,30 +992,30 @@ export const VictoryOverlay: React.FC<{
 
   return (
     <div
-      className={`fixed inset-0 z-40 bg-black/75 backdrop-blur-[3px] flex items-center justify-center p-3 sm:p-4 transition-opacity duration-300 ${
+      className={`fixed inset-0 z-40 bg-black/78 flex items-center justify-center p-2.5 sm:p-4 transition-opacity duration-300 ${
         entered ? 'opacity-100' : 'opacity-0'
       }`}
     >
       <div
         style={{
-          transform: entered ? 'scale(1) translateY(0px)' : 'scale(0.82) translateY(28px)',
-          transition: 'transform 460ms cubic-bezier(0.22, 1.18, 0.36, 1), opacity 320ms ease-out',
+          transform: entered ? 'scale(1) translateY(0px)' : 'scale(0.84) translateY(22px)',
+          transition: 'transform 420ms cubic-bezier(0.22, 1.18, 0.36, 1), opacity 280ms ease-out',
           boxShadow:
-            '0 0 42px rgba(255, 215, 0, 0.42), 0 20px 50px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+            '0 0 38px rgba(255, 215, 0, 0.38), 0 18px 44px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
         }}
-        className="relative w-full max-w-[610px] bg-gradient-to-b from-[#0F172A]/98 via-[#111C35]/98 to-[#091022]/98 border-2 border-[#FFD700] rounded-[22px] p-4 sm:p-5 overflow-hidden"
+        className="relative w-full max-w-[610px] max-h-[92%] overflow-y-auto bg-gradient-to-b from-[#0F172A]/98 via-[#111C35]/98 to-[#091022]/98 border-2 border-[#FFD700] rounded-[22px] p-3.5 sm:p-5"
       >
-        {/* Ambient Rotating Sunburst Glow Behind Winner Header */}
+        {/* Lightweight Static Golden Radial Spotlight Glow Behind Winner Header */}
         <div
           style={{
             background:
-              'conic-gradient(from 0deg, transparent 0deg, rgba(255, 215, 0, 0.14) 30deg, transparent 60deg, rgba(255, 215, 0, 0.12) 120deg, transparent 150deg, rgba(52, 211, 153, 0.14) 210deg, transparent 240deg, rgba(255, 215, 0, 0.14) 300deg, transparent 360deg)',
+              'radial-gradient(circle, rgba(255, 215, 0, 0.16) 0%, rgba(16, 185, 129, 0.08) 45%, transparent 72%)',
           }}
-          className="absolute -top-32 left-1/2 -translate-x-1/2 w-[420px] h-[420px] rounded-full pointer-events-none animate-[spin_14s_linear_infinite]"
+          className="absolute -top-24 left-1/2 -translate-x-1/2 w-[360px] h-[240px] rounded-full pointer-events-none"
         />
 
         {/* 1. Celebratory Winner Banner & Avatar Spotlight */}
-        <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-3.5 pb-3.5 border-b border-white/10">
+        <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-3 pb-3 border-b border-white/10">
           <div className="flex items-center gap-3.5">
             {/* Winner Avatar with Pulsing Champion Ring & Trophy Badge */}
             <div className="relative shrink-0">

@@ -6,7 +6,7 @@ const BGS = ['#8CC5B7', '#90CAF9', '#FDE7C8', '#7FD3CF', '#C9B8F5', '#F7B2BD'];
 const HAIRS = ['#4A2C1D', '#2B1B12', '#F2C14E', '#6E2C00'];
 const SHIRTS = ['#2A2160', '#14909A', '#FFB000', '#C0392B'];
 
-export const AvatarSvg: React.FC<{ avatarIndex: number; isMe?: boolean; size?: number }> = ({
+export const AvatarSvg: React.FC<{ avatarIndex: number; isMe?: boolean; size?: number }> = React.memo(({
   avatarIndex,
   isMe = false,
   size = 102,
@@ -41,7 +41,7 @@ export const AvatarSvg: React.FC<{ avatarIndex: number; isMe?: boolean; size?: n
       )}
     </svg>
   );
-};
+});
 
 interface PlayerSeatProps {
   player: GamePlayer;
@@ -52,7 +52,7 @@ interface PlayerSeatProps {
   isSevenPlayerMode?: boolean;
 }
 
-export const PlayerSeat: React.FC<PlayerSeatProps> = ({
+export const PlayerSeat: React.FC<PlayerSeatProps> = React.memo(({
   player,
   isCurrentTurn,
   isThinking = false,
@@ -197,4 +197,4 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
       </div>
     </div>
   );
-};
+});

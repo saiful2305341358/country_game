@@ -5,6 +5,7 @@ import '../models/game_card.dart';
 import '../services/audio_service.dart';
 import '../services/haptic_service.dart';
 import '../widgets/country_card_view.dart';
+import '../widgets/game_logo.dart';
 import '../widgets/playing_table.dart';
 
 /// A short, ultra-lightweight 2.4-second choreographed intro sequence that plays on app launch.
@@ -311,11 +312,7 @@ class _IntroVideoScreenState extends State<IntroVideoScreen>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
-                        Icons.public,
-                        color: Color(0xFFFFD54F),
-                        size: 18,
-                      ),
+                      const GameLogo(size: 24, withGlow: false),
                       const SizedBox(width: 8),
                       const Text(
                         'COUNTRY GAME',

@@ -6,6 +6,7 @@ import '../models/game_card.dart';
 import '../services/audio_service.dart';
 import '../services/haptic_service.dart';
 import '../widgets/country_card_view.dart';
+import '../widgets/game_logo.dart';
 import 'game_screen.dart';
 
 class PlayerSelectionScreen extends StatefulWidget {
@@ -274,6 +275,8 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  const GameLogo(size: 26, withGlow: false),
+                  const SizedBox(width: 8),
                   Text(
                     'Select Players',
                     style: TextStyle(

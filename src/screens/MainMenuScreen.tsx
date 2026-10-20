@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { CheckCircle2, Globe, HelpCircle, PlayCircle, Settings, Trophy } from 'lucide-react';
+import { CheckCircle2, HelpCircle, PlayCircle, Settings, Trophy } from 'lucide-react';
+import { GameLogo } from '../components/GameLogo';
 import { BilingualRulesDialog, PlayerStatsOverlay } from '../components/Overlays';
 
 interface MainMenuScreenProps {
@@ -18,25 +19,23 @@ export const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
     <div
       style={{
         background: 'radial-gradient(circle at center, #0F3B2C 0%, #09251B 55%, #03140E 100%)',
+        paddingTop: 'max(1rem, env(safe-area-inset-top))',
+        paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+        paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+        paddingRight: 'max(1rem, env(safe-area-inset-right))',
       }}
       className="relative w-full h-full flex items-center justify-center p-4 sm:p-8 overflow-y-auto"
     >
       <div className="w-full max-w-[820px] grid grid-cols-1 md:grid-cols-21 gap-6 md:gap-9 items-center">
         {/* Left Column: Brand Crest, Title, Tagline, Offline Badge */}
         <div className="md:col-span-11 flex flex-col items-center text-center">
-          {/* App Logo */}
-          <div
-            style={{
-              background: 'radial-gradient(circle, #1E293B 0%, #0F172A 100%)',
-              boxShadow: '0 0 20px 2px rgba(255, 215, 0, 0.3)',
-            }}
-            className="relative w-22 h-22 sm:w-24 sm:h-24 rounded-full border-[2.5px] border-[#FFD700] flex items-center justify-center mb-3.5"
-          >
-            <div className="absolute w-8 h-12 rounded bg-[#D97706] border border-[#FFD700] -rotate-12" />
-            <div className="absolute w-8 h-12 rounded bg-[#2563EB] border border-[#FFD700] rotate-12" />
-            <div className="relative w-8.5 h-13.5 rounded bg-[#0F172A] border-[1.5px] border-[#FFD700] shadow-md flex items-center justify-center">
-              <Globe size={20} className="text-[#38BDF8]" />
-            </div>
+          {/* Responsive Official Game Logo */}
+          <div className="mb-3.5 flex items-center justify-center">
+            <GameLogo
+              size={104}
+              className="w-[88px] h-[88px] sm:w-[104px] sm:h-[104px]"
+              ariaLabel="Country Card Game Emblem"
+            />
           </div>
 
           <h1
