@@ -208,6 +208,37 @@ export const CountryCardView: React.FC<CountryCardViewProps> = ({
           </svg>
         );
       }
+      case CountryType.brazil: {
+        // Iconic Brazilian Losango (Diamond Rhombus) & Celestial Sphere
+        return (
+          <svg viewBox="0 0 100 100" className="w-full h-full">
+            <polygon
+              points="50,14 82,44 50,74 18,44"
+              fill="none"
+              stroke={accent}
+              strokeOpacity={0.58}
+              strokeWidth={1.5}
+            />
+            <circle
+              cx="50"
+              cy="44"
+              r="14.5"
+              fill={accent}
+              fillOpacity={0.22}
+              stroke={accent}
+              strokeOpacity={0.62}
+              strokeWidth={1.4}
+            />
+            <path
+              d="M36 41 Q50 35 64 46"
+              fill="none"
+              stroke={accent}
+              strokeOpacity={0.65}
+              strokeWidth={1.3}
+            />
+          </svg>
+        );
+      }
     }
   };
 

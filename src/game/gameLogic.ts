@@ -1,5 +1,6 @@
 import {
   ALL_COUNTRY_TYPES,
+  BASE_SIX_COUNTRY_TYPES,
   COUNTRY_METADATA,
   CountryType,
   GameCard,
@@ -62,14 +63,20 @@ function getCombinations<T>(list: T[], k: number): T[][] {
 let previousSelection: CountryType[] | null = null;
 
 export function selectActiveTypes(totalPlayers: number, allowRepeat = false): CountryType[] {
-  const clamped = Math.max(3, Math.min(6, totalPlayers));
-  if (clamped === 6) {
+  const clamped = Math.max(3, Math.min(7, totalPlayers));
+  if (clamped === 7) {
     const shuffled = shuffleArray(ALL_COUNTRY_TYPES);
     previousSelection = [...shuffled];
     return shuffled;
   }
 
-  const allCombinations = getCombinations(ALL_COUNTRY_TYPES, clamped);
+  if (clamped === 6) {
+    const shuffled = shuffleArray(BASE_SIX_COUNTRY_TYPES);
+    previousSelection = [...shuffled];
+    return shuffled;
+  }
+
+  const allCombinations = getCombinations(BASE_SIX_COUNTRY_TYPES, clamped);
   let candidates = allCombinations;
 
   if (!allowRepeat && previousSelection !== null) {
@@ -370,7 +377,7 @@ export function createInitialGameState(
   totalPlayers: number,
   predefinedTypes?: CountryType[]
 ): GameState {
-  const n = Math.max(3, Math.min(6, totalPlayers));
+  const n = Math.max(3, Math.min(7, totalPlayers));
   const deckResult = createDeck(n, predefinedTypes);
   const players = performInitialExchange(deckResult.activeTypes, deckResult.ordinaryCardsByType);
   const startingIndex = Math.floor(Math.random() * n);

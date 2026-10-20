@@ -5,6 +5,7 @@ export enum CountryType {
   iran = 'iran',
   japan = 'japan',
   bangladesh = 'bangladesh',
+  brazil = 'brazil',
 }
 
 export interface CountryMetadata {
@@ -72,15 +73,29 @@ export const COUNTRY_METADATA: Record<CountryType, CountryMetadata> = {
     secondaryColor: '#3B0764',
     accentColor: '#DDD6FE',
   },
+  [CountryType.brazil]: {
+    id: CountryType.brazil,
+    displayName: 'Brazil',
+    nativeName: 'Brasil',
+    shortCode: 'BRA',
+    primaryColor: '#C026D3',
+    secondaryColor: '#4A044E',
+    accentColor: '#F5D0FE',
+  },
 };
 
-export const ALL_COUNTRY_TYPES: CountryType[] = [
+export const BASE_SIX_COUNTRY_TYPES: CountryType[] = [
   CountryType.australia,
   CountryType.greatBritain,
   CountryType.saudiArabia,
   CountryType.iran,
   CountryType.japan,
   CountryType.bangladesh,
+];
+
+export const ALL_COUNTRY_TYPES: CountryType[] = [
+  ...BASE_SIX_COUNTRY_TYPES,
+  CountryType.brazil,
 ];
 
 export interface GameCard {

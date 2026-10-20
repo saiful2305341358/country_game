@@ -216,7 +216,12 @@ class _GameScreenState extends State<GameScreen>
 
       if (!_hasRecordedWinningSetForMatch) {
         _hasRecordedWinningSetForMatch = true;
-        StatsService.instance.recordSetCompleted(winner, winningType);
+        StatsService.instance.recordSetCompleted(
+          winner,
+          winningType,
+          totalPlayers: state.totalPlayers,
+          turnCount: state.turnCount,
+        );
       }
 
       setState(() {

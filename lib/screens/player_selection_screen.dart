@@ -165,6 +165,13 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
                                   subtitle: 'Win Set: 6× Cards',
                                   isCompactH: isCompactH,
                                 ),
+                                const SizedBox(width: 8),
+                                _buildPlayerCountOption(
+                                  count: 7,
+                                  title: '7 Players',
+                                  subtitle: 'Win Set: 7× Cards',
+                                  isCompactH: isCompactH,
+                                ),
                               ],
                             ),
                           ),
@@ -397,7 +404,7 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
     return LayoutBuilder(
       builder: (context, stageConstraints) {
         final maxW = stageConstraints.maxWidth;
-        const maxPossibleCards = 6;
+        const maxPossibleCards = 7;
         const cardSpacing = 12.0;
         const labelReservation = 18.0;
 

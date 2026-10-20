@@ -11,6 +11,7 @@ class PlayerSeat extends StatefulWidget {
   final bool isExchanging;
   final bool isWinner;
   final bool isCompact;
+  final bool isSevenPlayerMode;
   final Animation<double>? exchangeAnimation;
 
   const PlayerSeat({
@@ -21,6 +22,7 @@ class PlayerSeat extends StatefulWidget {
     this.isExchanging = false,
     this.isWinner = false,
     this.isCompact = false,
+    this.isSevenPlayerMode = false,
     this.exchangeAnimation,
   });
 
@@ -77,9 +79,13 @@ class _PlayerSeatState extends State<PlayerSeat>
         ? Listenable.merge([_turnBloomController, widget.exchangeAnimation!])
         : _turnBloomController;
 
+    final isSevenPlayer = widget.isSevenPlayerMode;
+    final avatarDiameter = isSevenPlayer ? 104.0 : 112.0;
+    final innerAvatarSize = isSevenPlayer ? 95.0 : 102.0;
+
     final avatarArtwork = ClipOval(
       child: CustomPaint(
-        size: const Size(102, 102),
+        size: Size(innerAvatarSize, innerAvatarSize),
         painter: HtmlAvatarPainter(
           avatarIndex: playerId,
           isMe: widget.player.isHuman,
@@ -92,7 +98,7 @@ class _PlayerSeatState extends State<PlayerSeat>
     return RepaintBoundary(
       child: SizedBox(
         width: 156,
-        height: 162,
+        height: isSevenPlayer ? 152 : 162,
         child: AnimatedBuilder(
           animation: listenable,
           child: avatarArtwork,
@@ -111,13 +117,13 @@ class _PlayerSeatState extends State<PlayerSeat>
               clipBehavior: Clip.none,
               alignment: Alignment.topCenter,
               children: [
-                // 1. Radiant outer halo & luminous turn ring behind the avatar (centered at (78, 56))
+                // 1. Radiant outer halo & luminous turn ring behind the avatar
                 if (showTurnGlow)
                   Positioned(
-                    top: -26,
-                    left: -4,
-                    width: 164,
-                    height: 164,
+                    top: isSevenPlayer ? -22 : -26,
+                    left: isSevenPlayer ? 0 : -4,
+                    width: isSevenPlayer ? 156 : 164,
+                    height: isSevenPlayer ? 156 : 164,
                     child: IgnorePointer(
                       child: CustomPaint(
                         painter: ActiveAvatarTurnGlowPainter(
@@ -134,8 +140,8 @@ class _PlayerSeatState extends State<PlayerSeat>
                 Positioned(
                   top: 0,
                   child: Container(
-                    width: 112,
-                    height: 112,
+                    width: avatarDiameter,
+                    height: avatarDiameter,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
@@ -240,9 +246,9 @@ class _PlayerSeatState extends State<PlayerSeat>
                     ),
                   ),
 
-                // 4. Name tag pill (.tag) positioned at y + 66 from avatar center (56 + 66 = 122)
+                // 4. Name tag pill (.tag)
                 Positioned(
-                  top: 120,
+                  top: isSevenPlayer ? 111 : 120,
                   child: Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 14, vertical: 2),

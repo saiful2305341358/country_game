@@ -42,6 +42,7 @@ export const PlayerSelectionScreen: React.FC<PlayerSelectionScreenProps> = ({
     { count: 4, title: '4 Players', subtitle: 'Win Set: 4× Cards' },
     { count: 5, title: '5 Players', subtitle: 'Win Set: 5× Cards' },
     { count: 6, title: '6 Players', subtitle: 'Win Set: 6× Cards' },
+    { count: 7, title: '7 Players', subtitle: 'Win Set: 7× Cards' },
   ];
 
   return (
@@ -80,7 +81,7 @@ export const PlayerSelectionScreen: React.FC<PlayerSelectionScreenProps> = ({
         </div>
 
         {/* 2. Player Count Selector Row */}
-        <div className="grid grid-cols-4 gap-2 sm:gap-2.5">
+        <div className="grid grid-cols-5 gap-2 sm:gap-2.5">
           {playerOptions.map((opt) => {
             const isSelected = selectedPlayers === opt.count;
             return (

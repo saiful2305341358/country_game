@@ -30,7 +30,11 @@ import {
   getPlayerOrdinaryTypeCounts,
 } from '../models/types';
 import { AudioService, HapticService } from '../services/soundSynthesizer';
-import { PlayerStatsRecord, StatsService } from '../services/statsService';
+import {
+  computeRoundPoints,
+  PlayerStatsRecord,
+  StatsService,
+} from '../services/statsService';
 import { CountryCardView } from './CountryCardView';
 import { AvatarSvg } from './PlayerSeat';
 
@@ -257,10 +261,11 @@ export const PlayerStatsOverlay: React.FC<{
         </div>
 
         {/* Column Headers */}
-        <div className="grid grid-cols-11 px-3 text-[#FFE082] text-[10px] font-extrabold tracking-wider mb-1">
+        <div className="grid grid-cols-12 px-3 text-[#FFE082] text-[10px] font-extrabold tracking-wider mb-1">
           <div className="col-span-5">PLAYER</div>
-          <div className="col-span-3 text-center">GAMES PLAYED</div>
-          <div className="col-span-3 text-right">SETS COMPLETED</div>
+          <div className="col-span-2 text-center">GAMES</div>
+          <div className="col-span-2 text-center">SETS WON</div>
+          <div className="col-span-3 text-right">TOTAL POINTS</div>
         </div>
 
         {/* Player Rows */}
@@ -271,7 +276,7 @@ export const PlayerStatsOverlay: React.FC<{
             return (
               <div
                 key={record.name}
-                className={`grid grid-cols-11 items-center px-3 py-1.5 rounded-xl border ${
+                className={`grid grid-cols-12 items-center px-3 py-1.5 rounded-xl border ${
                   record.isHuman
                     ? 'bg-[#1E293B]/95 border-[#FFD700]/60'
                     : 'bg-white/[0.05] border-white/10'
@@ -313,13 +318,13 @@ export const PlayerStatsOverlay: React.FC<{
                   </div>
                 </div>
 
-                <div className="col-span-3 flex justify-center">
+                <div className="col-span-2 flex justify-center">
                   <span className="px-2.5 py-0.5 rounded-lg bg-white/[0.08] text-white text-xs font-bold">
                     {record.gamesPlayed}
                   </span>
                 </div>
 
-                <div className="col-span-3 flex justify-end">
+                <div className="col-span-2 flex justify-center">
                   <span
                     className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border text-xs font-black ${
                       record.setsCompleted > 0
@@ -332,6 +337,22 @@ export const PlayerStatsOverlay: React.FC<{
                       className={record.setsCompleted > 0 ? 'text-[#FFD700]' : 'text-white/40'}
                     />
                     {record.setsCompleted}
+                  </span>
+                </div>
+
+                <div className="col-span-3 flex justify-end">
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border text-xs font-black ${
+                      record.totalPoints > 0
+                        ? 'bg-[#10B981]/20 border-[#34D399]/60 text-[#6EE7B7]'
+                        : 'bg-white/[0.06] border-white/10 text-white/60'
+                    }`}
+                  >
+                    <Sparkles
+                      size={12}
+                      className={record.totalPoints > 0 ? 'text-[#34D399]' : 'text-white/35'}
+                    />
+                    {record.totalPoints.toLocaleString()} pts
                   </span>
                 </div>
               </div>
@@ -781,48 +802,180 @@ export const VictoryOverlay: React.FC<{
 }) => {
   const isHuman = winner.isHuman;
   const meta = COUNTRY_METADATA[winningType];
-  const cardWidth = totalPlayers >= 6 ? 44 : totalPlayers === 5 ? 48 : 52;
+  const cardWidth = totalPlayers >= 6 ? 42 : totalPlayers === 5 ? 46 : 50;
+
+  const { setBonus, speedBonus, roundPoints } = computeRoundPoints(totalPlayers, turnCount);
+  const winnerRecord = StatsService.getRecordForPlayer(winner);
+  const targetTotalPoints =
+    winnerRecord.totalPoints >= roundPoints ? winnerRecord.totalPoints : roundPoints;
+  const previousTotalPoints = Math.max(0, targetTotalPoints - roundPoints);
+
+  const [entered, setEntered] = useState(false);
+  const [displayedTotalPoints, setDisplayedTotalPoints] = useState(previousTotalPoints);
+  const [displayedRoundPoints, setDisplayedRoundPoints] = useState(0);
+
+  useEffect(() => {
+    const enterRaf = requestAnimationFrame(() => setEntered(true));
+
+    let animId = 0;
+    const start = performance.now();
+    const duration = 1050;
+
+    const tick = (now: number) => {
+      const raw = Math.min(1, Math.max(0, (now - start) / duration));
+      const eased = 1 - Math.pow(1 - raw, 3);
+      setDisplayedRoundPoints(Math.round(roundPoints * eased));
+      setDisplayedTotalPoints(
+        Math.round(previousTotalPoints + (targetTotalPoints - previousTotalPoints) * eased)
+      );
+      if (raw < 1) {
+        animId = requestAnimationFrame(tick);
+      }
+    };
+
+    animId = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(enterRaf);
+      cancelAnimationFrame(animId);
+    };
+  }, [previousTotalPoints, roundPoints, targetTotalPoints]);
 
   return (
-    <div className="fixed inset-0 z-40 bg-black/72 flex items-center justify-center p-4">
-      <div className="w-full max-w-[580px] bg-[#0F172A]/96 border-2 border-[#FFD700] rounded-[20px] p-5 shadow-[0_0_30px_rgba(255,215,0,0.35)]">
-        {/* Header */}
-        <div className="flex items-center justify-center gap-3 mb-3.5">
-          <div className="p-3 rounded-full bg-gradient-to-br from-[#FFD54F] to-[#B45309] shadow-lg">
-            <Trophy size={28} className="text-[#1E1B4B]" />
-          </div>
-          <div>
-            <div
-              className={`text-xl sm:text-2xl font-black tracking-widest ${
-                isHuman ? 'text-[#FFD700]' : 'text-[#FFB74D]'
-              }`}
-            >
-              {isHuman ? 'VICTORY!' : 'GAME OVER'}
+    <div
+      className={`fixed inset-0 z-40 bg-black/75 backdrop-blur-[3px] flex items-center justify-center p-3 sm:p-4 transition-opacity duration-300 ${
+        entered ? 'opacity-100' : 'opacity-0'
+      }`}
+    >
+      <div
+        style={{
+          transform: entered ? 'scale(1) translateY(0px)' : 'scale(0.82) translateY(28px)',
+          transition: 'transform 460ms cubic-bezier(0.22, 1.18, 0.36, 1), opacity 320ms ease-out',
+          boxShadow:
+            '0 0 42px rgba(255, 215, 0, 0.42), 0 20px 50px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+        }}
+        className="relative w-full max-w-[610px] bg-gradient-to-b from-[#0F172A]/98 via-[#111C35]/98 to-[#091022]/98 border-2 border-[#FFD700] rounded-[22px] p-4 sm:p-5 overflow-hidden"
+      >
+        {/* Ambient Rotating Sunburst Glow Behind Winner Header */}
+        <div
+          style={{
+            background:
+              'conic-gradient(from 0deg, transparent 0deg, rgba(255, 215, 0, 0.14) 30deg, transparent 60deg, rgba(255, 215, 0, 0.12) 120deg, transparent 150deg, rgba(52, 211, 153, 0.14) 210deg, transparent 240deg, rgba(255, 215, 0, 0.14) 300deg, transparent 360deg)',
+          }}
+          className="absolute -top-32 left-1/2 -translate-x-1/2 w-[420px] h-[420px] rounded-full pointer-events-none animate-[spin_14s_linear_infinite]"
+        />
+
+        {/* 1. Celebratory Winner Banner & Avatar Spotlight */}
+        <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-3.5 pb-3.5 border-b border-white/10">
+          <div className="flex items-center gap-3.5">
+            {/* Winner Avatar with Pulsing Champion Ring & Trophy Badge */}
+            <div className="relative shrink-0">
+              <div
+                style={{
+                  boxShadow:
+                    '0 0 0 3px #1E1B4B, 0 0 0 6px #FFD700, 0 0 24px 6px rgba(255, 213, 79, 0.65)',
+                }}
+                className="w-16 h-16 rounded-full overflow-hidden bg-[#2A2160] flex items-center justify-center"
+              >
+                <AvatarSvg avatarIndex={winner.id} isMe={winner.isHuman} size={64} />
+              </div>
+              <div className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-gradient-to-br from-[#FFF176] via-[#FFD54F] to-[#D97706] border-2 border-[#1E1B4B] flex items-center justify-center shadow-lg animate-bounce">
+                <Trophy size={14} className="text-[#1E1B4B]" />
+              </div>
             </div>
-            <div className="text-white text-xs sm:text-[13px] font-medium">
-              {isHuman
-                ? `You were the sole winner to collect all ${totalPlayers} cards of ${meta.displayName}!`
-                : `${winner.name} was the sole winner to collect all ${totalPlayers} cards of ${meta.displayName}!`}
+
+            {/* Winner Name & Round Victory Title */}
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFD700]/20 border border-[#FFD700]/60 text-[#FFE082] text-[10px] font-black tracking-widest uppercase mb-1">
+                <Sparkles size={11} className="text-[#FFD700]" />
+                {isHuman ? 'ROUND VICTORY!' : 'ROUND COMPLETE'}
+              </div>
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="text-white/75 text-xs font-bold uppercase tracking-wider">
+                  Winner:
+                </span>
+                <span className="text-[#FFD700] text-xl sm:text-2xl font-black tracking-wide drop-shadow-[0_2px_10px_rgba(255,215,0,0.45)]">
+                  {winner.name}
+                </span>
+              </div>
+              <div className="text-white/85 text-xs font-medium mt-0.5">
+                {isHuman
+                  ? `You collected all ${totalPlayers} cards of ${meta.displayName}!`
+                  : `${winner.name} collected all ${totalPlayers} cards of ${meta.displayName}!`}
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Animated Total Points & Round Score Counter Card */}
+          <div
+            style={{
+              background:
+                'linear-gradient(135deg, rgba(255, 215, 0, 0.16) 0%, rgba(16, 185, 129, 0.16) 100%)',
+              boxShadow: '0 0 20px rgba(255, 215, 0, 0.22)',
+            }}
+            className="shrink-0 px-4 py-2.5 rounded-2xl border border-[#FFD700]/70 flex flex-col items-center sm:items-end justify-center min-w-[168px]"
+          >
+            <div className="flex items-center gap-1.5 text-[#FFE082] text-[10px] font-extrabold tracking-widest uppercase">
+              <Award size={13} className="text-[#FFD700]" />
+              <span>WINNER TOTAL POINTS</span>
+            </div>
+            <div className="flex items-baseline gap-2 mt-0.5">
+              <span className="text-white text-2xl sm:text-[26px] font-black tabular-nums tracking-tight drop-shadow">
+                {displayedTotalPoints.toLocaleString()}
+              </span>
+              <span className="text-[#FFD700] text-xs font-black uppercase">PTS</span>
+            </div>
+            <div className="mt-0.5 px-2 py-0.5 rounded-full bg-[#10B981]/25 border border-[#34D399]/60 text-[#6EE7B7] text-[10.5px] font-black tabular-nums">
+              +{displayedRoundPoints} Round Pts
             </div>
           </div>
         </div>
 
-        {/* Winning Set Cards Row */}
-        <div className="flex items-center justify-center gap-2 overflow-x-auto py-1 mb-3">
+        {/* 3. Score Breakdown Strip */}
+        <div className="relative z-10 grid grid-cols-3 gap-2 my-3">
+          <div className="px-2.5 py-1.5 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-between">
+            <span className="text-white/65 text-[10.5px] font-semibold">Set Bonus ({totalPlayers}×)</span>
+            <span className="text-[#FFE082] text-xs font-black">+{setBonus}</span>
+          </div>
+          <div className="px-2.5 py-1.5 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-between">
+            <span className="text-white/65 text-[10.5px] font-semibold">Speed ({turnCount} turns)</span>
+            <span className="text-[#69F0AE] text-xs font-black">+{speedBonus}</span>
+          </div>
+          <div className="px-2.5 py-1.5 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-between">
+            <span className="text-white/65 text-[10.5px] font-semibold">Sets Won</span>
+            <span className="text-[#38BDF8] text-xs font-black">
+              {Math.max(1, winnerRecord.setsCompleted)}
+            </span>
+          </div>
+        </div>
+
+        {/* 4. Staggered Winning Set Cards Row */}
+        <div className="relative z-10 flex items-center justify-center gap-2 overflow-x-auto py-1.5 mb-3">
           {Array.from({ length: totalPlayers }, (_, i) => (
-            <CountryCardView
+            <div
               key={i}
-              card={{ id: `win_preview_${i}`, type: winningType, isStartingCard: false }}
-              width={cardWidth}
-              height={cardWidth * 2}
-            />
+              style={{
+                transform: entered
+                  ? 'translateY(0px) scale(1)'
+                  : 'translateY(18px) scale(0.84)',
+                opacity: entered ? 1 : 0,
+                transition: `transform 380ms cubic-bezier(0.22, 1.2, 0.36, 1) ${
+                  110 + i * 65
+                }ms, opacity 280ms ease-out ${110 + i * 65}ms`,
+              }}
+            >
+              <CountryCardView
+                card={{ id: `win_preview_${i}`, type: winningType, isStartingCard: false }}
+                width={cardWidth}
+                height={cardWidth * 2}
+              />
+            </div>
           ))}
         </div>
 
-        {/* Turn Count & Leaderboard Link */}
-        <div className="flex flex-wrap items-center justify-center gap-2.5 mb-3.5">
+        {/* 5. Leaderboard Link */}
+        <div className="relative z-10 flex flex-wrap items-center justify-center gap-2.5 mb-3">
           <div className="px-3 py-1 rounded-full bg-white/[0.08] border border-white/10 text-[#FFE082] text-[11px] font-bold">
-            Total Turns: {turnCount} • Winning Set: {totalPlayers}× {meta.displayName}
+            Completed Set: {totalPlayers}× {meta.displayName} ({meta.shortCode})
           </div>
           <button
             onClick={() => {
@@ -833,12 +986,12 @@ export const VictoryOverlay: React.FC<{
             className="flex items-center gap-1.5 text-[#FFD54F] hover:underline text-xs font-bold cursor-pointer"
           >
             <Trophy size={14} />
-            View Games Played & Sets Completed per Player
+            View All Players' Points & Sets Leaderboard
           </button>
         </div>
 
-        {/* Action Buttons */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* 6. Action Buttons */}
+        <div className="relative z-10 grid grid-cols-2 gap-3">
           <button
             onClick={() => {
               AudioService.playButtonClick();

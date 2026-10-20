@@ -63,6 +63,18 @@ const FIVE_OPPONENT_SLOTS = [
   { x: 1519, y: 762 },
 ];
 
+// Dedicated 6-opponent seat layout exclusively for 7-Player Mode (1 Human + 6 Bots)
+// Arranged in a symmetric 6-seat elliptical arc around the center table cards
+// with generous clearance from the top status bar, corner buttons, and 7-card human hand.
+const SIX_OPPONENT_SLOTS = [
+  { x: 340, y: 760 }, // Bot 1: Lower-Left
+  { x: 430, y: 430 }, // Bot 2: Mid-Upper-Left
+  { x: 730, y: 155 }, // Bot 3: Top-Left
+  { x: 1190, y: 155 }, // Bot 4: Top-Right
+  { x: 1490, y: 430 }, // Bot 5: Mid-Upper-Right
+  { x: 1580, y: 760 }, // Bot 6: Lower-Right
+];
+
 function getOpponentSeat(opponentIdx: number, totalPlayers: number): { x: number; y: number } {
   if (totalPlayers === 3) {
     return TWO_OPPONENT_SLOTS[opponentIdx % TWO_OPPONENT_SLOTS.length];
@@ -73,6 +85,9 @@ function getOpponentSeat(opponentIdx: number, totalPlayers: number): { x: number
   if (totalPlayers === 5) {
     const indices = [0, 1, 3, 4];
     return FIVE_OPPONENT_SLOTS[indices[opponentIdx % indices.length]];
+  }
+  if (totalPlayers === 7) {
+    return SIX_OPPONENT_SLOTS[opponentIdx % SIX_OPPONENT_SLOTS.length];
   }
   return FIVE_OPPONENT_SLOTS[opponentIdx % FIVE_OPPONENT_SLOTS.length];
 }
@@ -255,7 +270,12 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     if (state.winner && state.winningType) {
       if (!recordedWinRef.current) {
         recordedWinRef.current = true;
-        StatsService.recordSetCompleted(state.winner, state.winningType);
+        StatsService.recordSetCompleted(
+          state.winner,
+          state.winningType,
+          state.totalPlayers,
+          state.turnCount
+        );
         setCelebrationOrigin(getNormalizedSeatOrigin(state.winner.id, state.totalPlayers));
         if (state.winner.isHuman) {
           AudioService.playVictory();
@@ -587,13 +607,14 @@ export const GameScreen: React.FC<GameScreenProps> = ({
           const isPlayerExchanging = isAnimatingExchange && animatingPlayerIndex === opp.id;
           const isThinking = isCurrentTurn && !opp.isHuman && state.winner === null;
           const isWinner = state.winner?.id === opp.id;
+          const isSevenPlayer = state.totalPlayers === 7;
 
           return (
             <div
               key={opp.id}
               style={{
                 left: `${seat.x - 78}px`,
-                top: `${seat.y - 56}px`,
+                top: `${seat.y - (isSevenPlayer ? 52 : 56)}px`,
               }}
               className="absolute"
             >
@@ -603,6 +624,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 isThinking={isThinking}
                 isExchanging={isPlayerExchanging}
                 isWinner={isWinner}
+                isSevenPlayerMode={isSevenPlayer}
               />
             </div>
           );

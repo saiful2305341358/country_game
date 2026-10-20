@@ -15,20 +15,36 @@ class CardDeckFactory {
   /// Stores the most recent selection of types to avoid immediate repetition.
   static List<CountryType>? _previousSelection;
 
+  static const List<CountryType> allSevenTypes = [
+    CountryType.australia,
+    CountryType.greatBritain,
+    CountryType.saudiArabia,
+    CountryType.iran,
+    CountryType.japan,
+    CountryType.bangladesh,
+    CountryType.brazil,
+  ];
+
   /// Deterministically or randomly select [totalPlayers] distinct country types
-  /// from the 6 available countries without immediately repeating the previous combination.
+  /// without immediately repeating the previous combination.
   static List<CountryType> selectActiveTypes(
     int totalPlayers, {
     Random? random,
     bool allowRepeat = false,
   }) {
-    if (totalPlayers < 3 || totalPlayers > 6) {
+    if (totalPlayers < 3 || totalPlayers > 7) {
       throw ArgumentError(
-        'Supported player counts are 3, 4, 5, or 6. Received: $totalPlayers',
+        'Supported player counts are 3, 4, 5, 6, or 7. Received: $totalPlayers',
       );
     }
 
     final rng = random ?? Random();
+
+    if (totalPlayers == 7) {
+      final shuffled = List<CountryType>.from(allSevenTypes)..shuffle(rng);
+      _previousSelection = List.unmodifiable(shuffled);
+      return shuffled;
+    }
 
     if (totalPlayers == 6) {
       // Use all 6 types, but randomly permute their assignment

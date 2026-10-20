@@ -134,6 +134,22 @@ class _PlayingTableState extends State<PlayingTable>
     _StageSeatConfig(avatarPos: Offset(1519, 762)),
   ];
 
+  // Dedicated 6-opponent seat layout exclusively for 7-Player Mode (1 Human + 6 Bots)
+  static const List<_StageSeatConfig> _sixOpponentSlots = [
+    // 0: Bot 1 (Lower-Left)
+    _StageSeatConfig(avatarPos: Offset(340, 760)),
+    // 1: Bot 2 (Mid-Upper-Left)
+    _StageSeatConfig(avatarPos: Offset(430, 430)),
+    // 2: Bot 3 (Top-Left)
+    _StageSeatConfig(avatarPos: Offset(730, 155)),
+    // 3: Bot 4 (Top-Right)
+    _StageSeatConfig(avatarPos: Offset(1190, 155)),
+    // 4: Bot 5 (Mid-Upper-Right)
+    _StageSeatConfig(avatarPos: Offset(1490, 430)),
+    // 5: Bot 6 (Lower-Right)
+    _StageSeatConfig(avatarPos: Offset(1580, 760)),
+  ];
+
   late final AnimationController _passController;
 
   int _lastAnimatedTurnCount = 0;
@@ -323,6 +339,9 @@ class _PlayingTableState extends State<PlayingTable>
       // 4 bots: Bottom-Left, Top-Left, Top-Right, Bottom-Right
       const indices = [0, 1, 3, 4];
       return _fiveOpponentSlots[indices[opponentIdx % indices.length]];
+    } else if (totalPlayers == 7) {
+      // 6 bots: dedicated 6-seat arc around the playing table
+      return _sixOpponentSlots[opponentIdx % _sixOpponentSlots.length];
     } else {
       // 5 bots: all 5 slots
       return _fiveOpponentSlots[opponentIdx % _fiveOpponentSlots.length];
@@ -641,10 +660,11 @@ class _PlayingTableState extends State<PlayingTable>
       final isWinner =
           widget.state.isGameOver && widget.state.winner?.id == player.id;
 
+      final isSevenPlayer = totalPlayers == 7;
       widgets.add(
         Positioned(
           left: seat.avatarPos.dx - 78,
-          top: seat.avatarPos.dy - 56,
+          top: seat.avatarPos.dy - (isSevenPlayer ? 52 : 56),
           child: PlayerSeat(
             key: ValueKey<int>(player.id),
             player: player,
@@ -652,6 +672,7 @@ class _PlayingTableState extends State<PlayingTable>
             isThinking: isThinking,
             isExchanging: isPlayerExchanging,
             isWinner: isWinner,
+            isSevenPlayerMode: isSevenPlayer,
             exchangeAnimation: isPlayerExchanging ? _passController : null,
           ),
         ),

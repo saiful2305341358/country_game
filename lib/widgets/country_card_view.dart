@@ -437,6 +437,9 @@ class CardArtworkPainter extends CustomPainter {
       case CountryType.bangladesh:
         _paintBangladeshEmblem(canvas, size, center, type.accentColor);
         break;
+      case CountryType.brazil:
+        _paintBangladeshEmblem(canvas, size, center, type.accentColor);
+        break;
     }
 
     // Crisp inner card frame line

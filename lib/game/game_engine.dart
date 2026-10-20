@@ -57,8 +57,8 @@ class GameEngine extends ChangeNotifier {
     _isPaused = deferBotStart;
 
     final n = totalPlayers ?? _settings.totalPlayers;
-    if (n < 3 || n > 6) {
-      throw ArgumentError('Invalid player count: $n. Must be 3, 4, 5, or 6.');
+    if (n < 3 || n > 7) {
+      throw ArgumentError('Invalid player count: $n. Must be 3, 4, 5, 6, or 7.');
     }
 
     final rng = randomSeed != null ? Random(randomSeed) : Random();

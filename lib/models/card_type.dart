@@ -6,7 +6,8 @@ enum CountryType {
   saudiArabia,
   iran,
   japan,
-  bangladesh;
+  bangladesh,
+  brazil;
 
   String get id => name;
 
@@ -24,6 +25,8 @@ enum CountryType {
         return 'Japan';
       case CountryType.bangladesh:
         return 'Bangladesh';
+      case CountryType.brazil:
+        return 'Brazil';
     }
   }
 
@@ -41,6 +44,8 @@ enum CountryType {
         return '日本 • Nippon';
       case CountryType.bangladesh:
         return 'বাংলাদেশ';
+      case CountryType.brazil:
+        return 'Brasil';
     }
   }
 
@@ -58,6 +63,8 @@ enum CountryType {
         return 'JPN';
       case CountryType.bangladesh:
         return 'BGD';
+      case CountryType.brazil:
+        return 'BRA';
     }
   }
 
@@ -76,6 +83,8 @@ enum CountryType {
         return const Color(0xFFE11D48); // Imperial Crimson Red
       case CountryType.bangladesh:
         return const Color(0xFF7C3AED); // Deep Royal Amethyst Purple
+      case CountryType.brazil:
+        return const Color(0xFFAD1457); // Amazonian Magenta Gold
     }
   }
 
@@ -94,6 +103,8 @@ enum CountryType {
         return const Color(0xFF881337);
       case CountryType.bangladesh:
         return const Color(0xFF3B0764);
+      case CountryType.brazil:
+        return const Color(0xFF500724);
     }
   }
 
@@ -112,6 +123,8 @@ enum CountryType {
         return const Color(0xFFFDA4AF);
       case CountryType.bangladesh:
         return const Color(0xFFDDD6FE);
+      case CountryType.brazil:
+        return const Color(0xFFFBCFE8);
     }
   }
 }
