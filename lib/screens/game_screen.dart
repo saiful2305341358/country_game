@@ -42,6 +42,7 @@ class _GameScreenState extends State<GameScreen>
   bool _tutorialPausedEngine = false;
   bool _hasRecordedWinningSetForMatch = false;
   int _lastTurnCount = 0;
+  final Stopwatch _matchStopwatch = Stopwatch();
 
   // Celebration particle state triggered strictly when a player completes a winning set
   bool _showCelebrationParticles = false;
@@ -97,6 +98,9 @@ class _GameScreenState extends State<GameScreen>
     _showStatsOverlay = false;
     _hasRecordedWinningSetForMatch = false;
     _showCelebrationParticles = false;
+    _matchStopwatch
+      ..reset()
+      ..start();
 
     _engine.updateSettings(GameSettings.current);
     _engine.startNewGame(
@@ -228,11 +232,14 @@ class _GameScreenState extends State<GameScreen>
 
       if (!_hasRecordedWinningSetForMatch) {
         _hasRecordedWinningSetForMatch = true;
+        _matchStopwatch.stop();
+        final elapsedSec = _matchStopwatch.elapsed.inSeconds.clamp(5, 600);
         StatsService.instance.recordSetCompleted(
           winner,
           winningType,
           totalPlayers: state.totalPlayers,
           turnCount: state.turnCount,
+          durationSeconds: elapsedSec,
         );
       }
 

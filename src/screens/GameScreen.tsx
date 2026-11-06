@@ -199,6 +199,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({
   const playedExchangeOutgoingRef = useRef(false);
   const isGamePausedRef = useRef(false);
   const immediateResumeFromTutorialRef = useRef(false);
+  const matchStartTimeRef = useRef<number>(performance.now());
+  const pausedAccumulatedMsRef = useRef<number>(0);
+  const pauseStartedAtRef = useRef<number | null>(null);
   const botTurnTimerStateRef = useRef<{
     turnCount: number;
     remainingMs: number;
@@ -220,6 +223,17 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     showStatsOverlay;
 
   isGamePausedRef.current = isGamePaused;
+
+  useEffect(() => {
+    if (isGamePaused) {
+      if (pauseStartedAtRef.current === null) {
+        pauseStartedAtRef.current = performance.now();
+      }
+    } else if (pauseStartedAtRef.current !== null) {
+      pausedAccumulatedMsRef.current += Math.max(0, performance.now() - pauseStartedAtRef.current);
+      pauseStartedAtRef.current = null;
+    }
+  }, [isGamePaused]);
 
   // Measure viewport to scale 1920x1080 stage cleanly on all mobile orientations
   useEffect(() => {
@@ -379,11 +393,17 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     if (state.winner && state.winningType) {
       if (!recordedWinRef.current) {
         recordedWinRef.current = true;
+        const activeElapsedMs = Math.max(
+          5000,
+          performance.now() - matchStartTimeRef.current - pausedAccumulatedMsRef.current
+        );
+        const durationSeconds = Math.round(activeElapsedMs / 1000);
         StatsService.recordSetCompleted(
           state.winner,
           state.winningType,
           state.totalPlayers,
-          state.turnCount
+          state.turnCount,
+          durationSeconds
         );
         setCelebrationOrigin(getNormalizedSeatOrigin(state.winner.id, state.totalPlayers));
         if (state.winner.isHuman) {
@@ -547,6 +567,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     exchangeProgressRef.current = 0;
     playedExchangeLandingRef.current = false;
     playedExchangeOutgoingRef.current = false;
+    matchStartTimeRef.current = performance.now();
+    pausedAccumulatedMsRef.current = 0;
+    pauseStartedAtRef.current = null;
     const fresh = createInitialGameState(totalPlayers, predefinedTypes);
     setState(fresh);
     setIsAnimatingExchange(false);

@@ -268,6 +268,33 @@ export function evaluateBotDecision(state: GameState, baseDelayMs = 1650): BotDe
   const tableCard = state.tableCard;
   const typeCountsInHand = getPlayerOrdinaryTypeCounts(bot);
 
+  // Identify the human player's primary country so bots avoid hoarding it
+  // and naturally circulate those cards onto the table for a more approachable experience.
+  const humanPlayer = state.players.find((p) => p.isHuman) ?? null;
+  let humanTargetType: CountryType | null = null;
+  let humanMaxCount = 0;
+  if (humanPlayer) {
+    const humanCounts = getPlayerOrdinaryTypeCounts(humanPlayer);
+    for (const [typeKey, countVal] of Object.entries(humanCounts)) {
+      const type = typeKey as CountryType;
+      const c = countVal ?? 0;
+      if (
+        c > humanMaxCount ||
+        (c === humanMaxCount && type === humanPlayer.homeType)
+      ) {
+        humanMaxCount = c;
+        humanTargetType = type;
+      }
+    }
+    if (!humanTargetType) {
+      humanTargetType = humanPlayer.homeType;
+    }
+  }
+
+  const isHumanNext =
+    (state.currentTurnPlayerIndex + 1) % state.totalPlayers === 0;
+  const isRelaxedPivotTurn = (state.turnCount + bot.id) % 2 === 0;
+
   let targetType: CountryType | null = null;
   let maxCount = 0;
 
@@ -276,6 +303,10 @@ export function evaluateBotDecision(state: GameState, baseDelayMs = 1650): BotDe
     let effectiveCount = countVal ?? 0;
     if (!tableCard.isStartingCard && tableCard.type === type) {
       effectiveCount += 1;
+    }
+    // Prefer pursuing a country different from the human player's leading set
+    if (humanTargetType && type === humanTargetType && effectiveCount < winningSetSize) {
+      effectiveCount = Math.max(0, effectiveCount - 1);
     }
     if (effectiveCount > maxCount) {
       maxCount = effectiveCount;
@@ -301,24 +332,37 @@ export function evaluateBotDecision(state: GameState, baseDelayMs = 1650): BotDe
     let score = 0.0;
 
     if (candidate.isStartingCard) {
-      score += 95.0;
+      score += 85.0;
     } else {
       const cType = candidate.type!;
       const count = typeCountsInHand[cType] ?? 0;
 
       if (completesWinningSet && cType === tableCard.type) {
         score -= 2000.0;
+      } else if (
+        humanTargetType &&
+        cType === humanTargetType &&
+        count < winningSetSize - 1
+      ) {
+        // Friendly circulation: bots release cards belonging to the human's primary country
+        // rather than locking them up, especially when the human player acts next.
+        score += isHumanNext ? 145.0 : 75.0;
       } else if (cType === targetType) {
-        score -= 500.0 * count;
+        if (isRelaxedPivotTurn && !completesWinningSet && count >= 2) {
+          // Occasional casual pivot so bots do not race to N-of-a-kind at perfect speed
+          score -= 55.0 * count;
+        } else {
+          score -= 180.0 * count;
+        }
       } else {
         if (count === 1) {
-          score += 120.0;
+          score += 115.0;
         } else if (count === 2) {
-          score += 20.0;
+          score += isRelaxedPivotTurn ? 45.0 : 22.0;
         } else if (count >= winningSetSize - 1) {
-          score -= 400.0;
+          score -= isRelaxedPivotTurn ? 65.0 : 160.0;
         } else if (count >= 3) {
-          score -= 220.0;
+          score -= 90.0;
         }
       }
 
@@ -327,11 +371,11 @@ export function evaluateBotDecision(state: GameState, baseDelayMs = 1650): BotDe
         !state.lastTakenCard.isStartingCard &&
         state.lastTakenCard.type === cType
       ) {
-        score -= 12.0;
+        score -= 8.0;
       }
 
-      if (cType === bot.homeType) {
-        score -= 5.0;
+      if (cType === bot.homeType && cType !== humanTargetType) {
+        score -= 3.0;
       }
 
       score += ((i + state.turnCount) % 3) * 0.5;

@@ -61,6 +61,29 @@ class BotStrategy {
     final tableCard = state.tableCard;
     final typeCountsInHand = bot.ordinaryTypeCounts;
 
+    // Identify the human player's primary country so bots avoid hoarding it
+    // and naturally circulate those cards onto the table for a more approachable experience.
+    CountryType? humanTargetType;
+    int humanMaxCount = 0;
+    for (final p in state.players) {
+      if (p.isHuman) {
+        final humanCounts = p.ordinaryTypeCounts;
+        for (final entry in humanCounts.entries) {
+          if (entry.value > humanMaxCount ||
+              (entry.value == humanMaxCount && entry.key == p.homeType)) {
+            humanMaxCount = entry.value;
+            humanTargetType = entry.key;
+          }
+        }
+        humanTargetType ??= p.homeType;
+        break;
+      }
+    }
+
+    final bool isHumanNext =
+        ((state.currentTurnPlayerIndex + 1) % state.totalPlayers) == 0;
+    final bool isRelaxedPivotTurn = ((state.turnCount + bot.id) % 2) == 0;
+
     // Determine bot's primary strategic target type
     CountryType? targetType;
     int maxCount = 0;
@@ -68,6 +91,12 @@ class BotStrategy {
       int effectiveCount = entry.value;
       if (!tableCard.isStartingCard && tableCard.type == entry.key) {
         effectiveCount += 1;
+      }
+      // Prefer pursuing a country different from the human player's leading set
+      if (humanTargetType != null &&
+          entry.key == humanTargetType &&
+          effectiveCount < winningSetSize) {
+        effectiveCount = (effectiveCount - 1).clamp(0, winningSetSize);
       }
       if (effectiveCount > maxCount) {
         maxCount = effectiveCount;
@@ -94,9 +123,9 @@ class BotStrategy {
       double score = 0.0;
 
       if (candidate.isStartingCard) {
-        // Discarding starting card is strongly favored when building a country set,
+        // Discarding starting card is favored when building a country set,
         // because the starting card cannot contribute to an N-card country victory.
-        score += 95.0;
+        score += 85.0;
       } else {
         final cType = candidate.type!;
         final count = typeCountsInHand[cType] ?? 0;
@@ -104,33 +133,42 @@ class BotStrategy {
         if (completesWinningSet && cType == tableCard.type) {
           // Never discard a card belonging to the set we are about to complete
           score -= 2000.0;
+        } else if (humanTargetType != null &&
+            cType == humanTargetType &&
+            count < (winningSetSize - 1)) {
+          // Friendly circulation: bots release cards belonging to the human's primary country
+          // rather than locking them up, especially when the human player acts next.
+          score += isHumanNext ? 145.0 : 75.0;
         } else if (cType == targetType) {
-          // Severely penalize discarding our primary target country
-          score -= 500.0 * count;
+          if (isRelaxedPivotTurn && !completesWinningSet && count >= 2) {
+            // Occasional casual pivot so bots do not race to N-of-a-kind at perfect speed
+            score -= 55.0 * count;
+          } else {
+            score -= 180.0 * count;
+          }
         } else {
           // Prefer discarding singletons over pairs or larger sets
           if (count == 1) {
-            score += 120.0;
+            score += 115.0;
           } else if (count == 2) {
-            score += 20.0;
+            score += isRelaxedPivotTurn ? 45.0 : 22.0;
           } else if (count >= winningSetSize - 1) {
-            score -= 400.0; // Never break a set 1 card away from winning
+            score -= isRelaxedPivotTurn ? 65.0 : 160.0;
           } else if (count >= 3) {
-            score -= 220.0;
+            score -= 90.0;
           }
         }
 
-        // Subtle memory of the last taken card: avoid immediately feeding the exact
-        // country the previous player just picked up if another singleton is available.
+        // Subtle memory of the last taken card
         if (state.lastTakenCard != null &&
             !state.lastTakenCard!.isStartingCard &&
             state.lastTakenCard!.type == cType) {
-          score -= 12.0;
+          score -= 8.0;
         }
 
         // Slight preference to keep home type if count is tied
-        if (cType == bot.homeType) {
-          score -= 5.0;
+        if (cType == bot.homeType && cType != humanTargetType) {
+          score -= 3.0;
         }
 
         // Small deterministic tie-breaker across hand slots

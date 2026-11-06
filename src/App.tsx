@@ -4,10 +4,11 @@ import { GameScreen } from './screens/GameScreen';
 import { IntroVideoScreen } from './screens/IntroVideoScreen';
 import { MainMenuScreen } from './screens/MainMenuScreen';
 import { PlayerSelectionScreen } from './screens/PlayerSelectionScreen';
+import { ProfileScreen } from './screens/ProfileScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { loadPersistedSettings, savePersistedSettings } from './services/soundSynthesizer';
 
-export type ScreenRoute = 'intro' | 'menu' | 'playerSelection' | 'settings' | 'game';
+export type ScreenRoute = 'intro' | 'menu' | 'playerSelection' | 'settings' | 'profile' | 'game';
 
 const SESSION_INTRO_KEY = 'ccg_intro_played_session';
 let hasPlayedIntroInMemory = false;
@@ -91,6 +92,7 @@ export function App() {
     previousByRoute: {
       playerSelection: 'menu',
       settings: 'menu',
+      profile: 'menu',
       game: 'playerSelection',
     },
   }));
@@ -280,8 +282,11 @@ export function App() {
         <MainMenuScreen
           onPlayGame={() => navigateTo('playerSelection', 'menu')}
           onOpenSettings={() => navigateTo('settings', 'menu')}
+          onOpenProfile={() => navigateTo('profile', 'menu')}
         />
       )}
+
+      {route === 'profile' && <ProfileScreen onBack={() => navigateBack('profile')} />}
 
       {route === 'playerSelection' && (
         <PlayerSelectionScreen
