@@ -386,7 +386,7 @@ class _PlayedCardsHistoryOverlayState extends State<PlayedCardsHistoryOverlay> {
                             ),
                             padding: const EdgeInsets.symmetric(horizontal: 2),
                             itemCount: orderedEntries.length,
-                            separatorBuilder: (_, __) =>
+                            separatorBuilder: (context, index) =>
                                 const SizedBox(width: _cardGap),
                             itemBuilder: (context, index) {
                               final entry = orderedEntries[index];

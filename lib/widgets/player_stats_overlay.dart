@@ -250,7 +250,8 @@ class _PlayerStatsOverlayState extends State<PlayerStatsOverlay> {
                         child: ListView.separated(
                           shrinkWrap: true,
                           itemCount: records.length,
-                          separatorBuilder: (_, _) => const SizedBox(height: 5),
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 5),
                           itemBuilder: (context, index) {
                             final record = records[index];
                             final livePlayer = activeByName[record.name];

@@ -1011,12 +1011,12 @@ class _PlayingTableState extends State<PlayingTable>
     // Keep the actively moving card on top while preserving Element identity via ValueKeys
     final children = p < _phase4Start
         ? <Widget>[
-            ?takenLayer,
-            ?discardedLayer,
+            if (takenLayer != null) takenLayer,
+            if (discardedLayer != null) discardedLayer,
           ]
         : <Widget>[
-            ?discardedLayer,
-            ?takenLayer,
+            if (discardedLayer != null) discardedLayer,
+            if (takenLayer != null) takenLayer,
           ];
 
     return Stack(

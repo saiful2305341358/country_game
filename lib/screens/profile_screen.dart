@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../models/card_type.dart';
 import '../services/audio_service.dart';
 import '../services/haptic_service.dart';
 import '../services/stats_service.dart';
@@ -571,10 +570,10 @@ class _WinTimeBarChartPainter extends CustomPainter {
     }
     if (avgSec + 10 > maxVal) maxVal = avgSec + 10;
 
-    final double chartTop = 16.0;
+    const double chartTop = 16.0;
     final double chartBottom = size.height - 22.0;
     final double chartHeight = math.max(20.0, chartBottom - chartTop);
-    final double chartLeft = 8.0;
+    const double chartLeft = 8.0;
     final double chartRight = size.width - 8.0;
     final double chartWidth = math.max(40.0, chartRight - chartLeft);
 

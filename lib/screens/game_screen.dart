@@ -375,7 +375,8 @@ class _GameScreenState extends State<GameScreen>
       barrierLabel: 'Dismiss Leave Game Dialog',
       barrierColor: Colors.black.withValues(alpha: 0.65),
       transitionDuration: const Duration(milliseconds: 200),
-      pageBuilder: (dialogContext, _, __) => ExitConfirmationDialog(
+      pageBuilder: (dialogContext, animation, secondaryAnimation) =>
+          ExitConfirmationDialog(
         onStayInGame: () {
           Navigator.pop(dialogContext);
         },
@@ -385,7 +386,7 @@ class _GameScreenState extends State<GameScreen>
           Navigator.pop(context);
         },
       ),
-      transitionBuilder: (context, anim, _, child) {
+      transitionBuilder: (context, anim, secondaryAnimation, child) {
         final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
         return FadeTransition(
           opacity: curved,
