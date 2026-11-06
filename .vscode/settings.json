@@ -1,0 +1,21 @@
+{
+  "dart.runPubGetOnPubspecChanges": "always",
+  "dart.analysisExcludedFolders": [
+    "node_modules",
+    "dist",
+    "build",
+    ".aistudio",
+    "android",
+    "ios",
+    "web",
+    "windows",
+    "macos",
+    "linux"
+  ],
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/.dart_tool": true
+  }
+}
