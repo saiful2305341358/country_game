@@ -10,6 +10,7 @@ import '../services/haptic_service.dart';
 import '../services/stats_service.dart';
 import '../widgets/celebration_particles_overlay.dart';
 import '../widgets/game_controls_dialog.dart';
+import '../widgets/played_cards_history_overlay.dart';
 import '../widgets/player_stats_overlay.dart';
 import '../widgets/playing_table.dart';
 import '../widgets/tutorial_modal_overlay.dart';
@@ -35,6 +36,7 @@ class _GameScreenState extends State<GameScreen>
   late final AnimationController _dealingController;
 
   bool _isDealing = false;
+  bool _showHistoryOverlay = false;
   bool _showStatsOverlay = false;
   bool _showTutorialOverlay = false;
   bool _tutorialPausedEngine = false;
@@ -75,17 +77,18 @@ class _GameScreenState extends State<GameScreen>
           if (_engine.state?.isHumanTurn == true) {
             HapticService.instance.yourTurnNotice();
           }
-          if (!_showStatsOverlay && !_tutorialPausedEngine) {
+          if (!_showHistoryOverlay &&
+              !_showStatsOverlay &&
+              !_tutorialPausedEngine) {
             _engine.resumeActivePlay();
           }
         }
       });
 
-    // Show non-intrusive tutorial overlay automatically for first-time players
+    // Show tutorial overlay automatically for first-time players and pause gameplay while open
     if (!TutorialModalOverlay.hasSeenTutorial) {
       _showTutorialOverlay = true;
-      _tutorialPausedEngine = false;
-      TutorialModalOverlay.markTutorialSeen();
+      _tutorialPausedEngine = true;
     }
 
     _startMatch();
@@ -102,28 +105,35 @@ class _GameScreenState extends State<GameScreen>
     _engine.startNewGame(
       totalPlayers: widget.totalPlayers,
       predefinedTypes: widget.predefinedTypes,
-      deferBotStart: animateDeal,
+      deferBotStart: animateDeal || _showTutorialOverlay,
     );
+
+    if (_showTutorialOverlay) {
+      _tutorialPausedEngine = true;
+      _engine.pauseActivePlay();
+    }
 
     if (_engine.state != null) {
       StatsService.instance.recordGameStarted(_engine.state!.players);
     }
 
-    // Physical card dealing riffle + shuffle haptic pulse on Game Start
-    if (animateDeal) {
-      AudioService.instance.playExchange();
-    } else {
-      AudioService.instance.playGameStart();
-    }
-    HapticService.instance.dealShuffle();
-
     if (animateDeal) {
       setState(() => _isDealing = true);
-      _dealingController.forward(from: 0.0);
+      if (_showTutorialOverlay) {
+        _dealingController.value = 0.0;
+      } else {
+        AudioService.instance.playExchange();
+        HapticService.instance.dealShuffle();
+        _dealingController.forward(from: 0.0);
+      }
     } else {
       setState(() => _isDealing = false);
-      if (_engine.state?.isHumanTurn == true) {
-        HapticService.instance.yourTurnNotice();
+      if (!_showTutorialOverlay) {
+        AudioService.instance.playGameStart();
+        HapticService.instance.dealShuffle();
+        if (_engine.state?.isHumanTurn == true) {
+          HapticService.instance.yourTurnNotice();
+        }
       }
     }
   }
@@ -264,7 +274,13 @@ class _GameScreenState extends State<GameScreen>
   }
 
   void _onCardSelected(GameCard card) {
-    if (_isDealing || _engine.isProcessingMove) return;
+    if (_isDealing ||
+        _showTutorialOverlay ||
+        _showHistoryOverlay ||
+        _showStatsOverlay ||
+        _engine.isProcessingMove) {
+      return;
+    }
     final success = _engine.makeMove(card);
     if (success) {
       HapticService.instance.cardPass();
@@ -273,22 +289,49 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
-  void _openStatsOverlay() {
+  void _openHistoryOverlay() {
     AudioService.instance.playButtonClick();
     HapticService.instance.uiTap();
     _engine.pauseActivePlay();
+    if (_isDealing && _dealingController.isAnimating) {
+      _dealingController.stop(canceled: false);
+    }
     setState(() {
       _showTutorialOverlay = false;
-      _showStatsOverlay = true;
+      _tutorialPausedEngine = false;
+      _showStatsOverlay = false;
+      _showHistoryOverlay = !_showHistoryOverlay;
     });
+    if (!_showHistoryOverlay &&
+        !_showStatsOverlay &&
+        !_showTutorialOverlay) {
+      if (_isDealing && _dealingController.value < 1.0) {
+        _dealingController.forward();
+      } else if (!_isDealing && _engine.state?.isGameOver != true) {
+        _engine.resumeActivePlay();
+      }
+    }
+  }
+
+  void _closeHistoryOverlay() {
+    setState(() => _showHistoryOverlay = false);
+    if (!_showStatsOverlay && !_showTutorialOverlay) {
+      if (_isDealing && _dealingController.value < 1.0) {
+        _dealingController.forward();
+      } else if (!_isDealing && _engine.state?.isGameOver != true) {
+        _engine.resumeActivePlay();
+      }
+    }
   }
 
   void _closeStatsOverlay() {
     setState(() => _showStatsOverlay = false);
-    if (!_isDealing &&
-        !_showTutorialOverlay &&
-        _engine.state?.isGameOver != true) {
-      _engine.resumeActivePlay();
+    if (!_showHistoryOverlay && !_showTutorialOverlay) {
+      if (_isDealing && _dealingController.value < 1.0) {
+        _dealingController.forward();
+      } else if (!_isDealing && _engine.state?.isGameOver != true) {
+        _engine.resumeActivePlay();
+      }
     }
   }
 
@@ -296,7 +339,11 @@ class _GameScreenState extends State<GameScreen>
     AudioService.instance.playButtonClick();
     HapticService.instance.uiTap();
     _engine.pauseActivePlay();
+    if (_isDealing && _dealingController.isAnimating) {
+      _dealingController.stop(canceled: false);
+    }
     setState(() {
+      _showHistoryOverlay = false;
       _showStatsOverlay = false;
       _showTutorialOverlay = true;
       _tutorialPausedEngine = true;
@@ -305,12 +352,22 @@ class _GameScreenState extends State<GameScreen>
 
   void _closeTutorialOverlay() {
     final wasPausedByTutorial = _tutorialPausedEngine;
+    TutorialModalOverlay.markTutorialSeen();
     setState(() {
       _showTutorialOverlay = false;
       _tutorialPausedEngine = false;
     });
+    if (_isDealing && _dealingController.value < 1.0) {
+      if (_dealingController.value == 0.0) {
+        AudioService.instance.playExchange();
+        HapticService.instance.dealShuffle();
+      }
+      _dealingController.forward();
+      return;
+    }
     if (wasPausedByTutorial &&
         !_isDealing &&
+        !_showHistoryOverlay &&
         !_showStatsOverlay &&
         _engine.state?.isGameOver != true) {
       _engine.resumeActivePlay();
@@ -321,6 +378,9 @@ class _GameScreenState extends State<GameScreen>
     AudioService.instance.playButtonClick();
     HapticService.instance.uiTap();
     _engine.pauseActivePlay();
+    if (_isDealing && _dealingController.isAnimating) {
+      _dealingController.stop(canceled: false);
+    }
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -348,11 +408,16 @@ class _GameScreenState extends State<GameScreen>
         );
       },
     ).then((_) {
-      if (mounted &&
-          !_isDealing &&
-          !_showStatsOverlay &&
-          !_tutorialPausedEngine &&
-          _engine.state?.isGameOver != true) {
+      if (!mounted ||
+          _showHistoryOverlay ||
+          _showStatsOverlay ||
+          _showTutorialOverlay ||
+          _tutorialPausedEngine) {
+        return;
+      }
+      if (_isDealing && _dealingController.value < 1.0) {
+        _dealingController.forward();
+      } else if (!_isDealing && _engine.state?.isGameOver != true) {
         _engine.resumeActivePlay();
       }
     });
@@ -362,6 +427,9 @@ class _GameScreenState extends State<GameScreen>
     AudioService.instance.playButtonClick();
     HapticService.instance.uiTap();
     _engine.pauseActivePlay();
+    if (_isDealing && _dealingController.isAnimating) {
+      _dealingController.stop(canceled: false);
+    }
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -389,7 +457,15 @@ class _GameScreenState extends State<GameScreen>
         },
         onResume: () {
           Navigator.pop(context);
-          if (!_isDealing && !_showStatsOverlay && !_tutorialPausedEngine) {
+          if (_showHistoryOverlay ||
+              _showStatsOverlay ||
+              _showTutorialOverlay ||
+              _tutorialPausedEngine) {
+            return;
+          }
+          if (_isDealing && _dealingController.value < 1.0) {
+            _dealingController.forward();
+          } else if (!_isDealing && _engine.state?.isGameOver != true) {
             _engine.resumeActivePlay();
           }
         },
@@ -400,7 +476,7 @@ class _GameScreenState extends State<GameScreen>
         onMainMenu: () {
           Navigator.pop(context);
           _engine.leaveGame();
-          Navigator.pop(context);
+          Navigator.of(context).popUntil((route) => route.isFirst);
         },
       ),
     );
@@ -434,6 +510,11 @@ class _GameScreenState extends State<GameScreen>
         state.winner != null &&
         state.winningType != null;
 
+    final isTablePaused = _showTutorialOverlay ||
+        _showHistoryOverlay ||
+        _showStatsOverlay ||
+        _engine.isPaused;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -447,6 +528,7 @@ class _GameScreenState extends State<GameScreen>
             // 1. Main Horizontal Playing Table with localized Dealing & Sequential Exchange Animation layers
             PlayingTable(
               state: state,
+              isPaused: isTablePaused,
               isProcessingMove: _engine.isProcessingMove,
               isDealing: _isDealing,
               dealingProgress: _dealingController.value,
@@ -456,12 +538,15 @@ class _GameScreenState extends State<GameScreen>
               onExchangeAnimationComplete: _onExchangeAnimationComplete,
               onBack: _showExitConfirmationDialog,
               onPause: _showPauseDialog,
-              onShowStats: _openStatsOverlay,
+              onShowHistory: _openHistoryOverlay,
               onShowTutorial: _openTutorialOverlay,
             ),
 
           // 2. Victory Overlay (shown once the winning exchange animation finishes)
-          if (showVictoryModal && !_showStatsOverlay && !_showTutorialOverlay)
+          if (showVictoryModal &&
+              !_showHistoryOverlay &&
+              !_showStatsOverlay &&
+              !_showTutorialOverlay)
             Positioned.fill(
               child: Container(
                 color: Colors.black.withValues(alpha: 0.72),
@@ -474,13 +559,23 @@ class _GameScreenState extends State<GameScreen>
                   onViewStats: () => setState(() => _showStatsOverlay = true),
                   onMainMenu: () {
                     _engine.leaveGame();
-                    Navigator.pop(context);
+                    Navigator.of(context).popUntil((route) => route.isFirst);
                   },
                 ),
               ),
             ),
 
-          // 3. Player Stats & Sets Completed Overlay
+          // 3. Small, Scrollable Last 5 Cards Played History Overlay
+          if (_showHistoryOverlay)
+            Positioned.fill(
+              child: PlayedCardsHistoryOverlay(
+                recentPlayedCards: state.recentPlayedCards,
+                currentTableCardName: state.tableCard.displayName,
+                onClose: _closeHistoryOverlay,
+              ),
+            ),
+
+          // 4. Player Stats & Sets Completed Overlay (accessible from Victory screen)
           if (_showStatsOverlay)
             Positioned.fill(
               child: Container(
@@ -493,7 +588,7 @@ class _GameScreenState extends State<GameScreen>
               ),
             ),
 
-          // 4. Non-Intrusive Tutorial Modal Overlay for New Players
+          // 5. Non-Intrusive Tutorial Modal Overlay for New Players
           if (_showTutorialOverlay)
             Positioned.fill(
               child: TutorialModalOverlay(

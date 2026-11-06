@@ -164,6 +164,16 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   totalPlayers: 4,
 };
 
+export interface PlayedCardHistoryEntry {
+  turnNumber: number;
+  playerId: number;
+  playerName: string;
+  isHuman: boolean;
+  isFemale: boolean;
+  playedCard: GameCard;
+  takenCard: GameCard;
+}
+
 export interface GameState {
   totalPlayers: number;
   activeTypes: CountryType[];
@@ -177,6 +187,7 @@ export interface GameState {
   winningType: CountryType | null;
   statusMessage: string;
   moveLog: string[];
+  recentPlayedCards: PlayedCardHistoryEntry[];
   lastMovePlayerIndex: number | null;
   lastMoveHandIndex: number | null;
   lastTakenCard: GameCard | null;

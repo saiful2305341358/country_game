@@ -1,9 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Award,
   BookOpen,
   Check,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Globe,
   HelpCircle,
   Home,
@@ -28,7 +30,9 @@ import {
   COUNTRY_METADATA,
   CountryType,
   GamePlayer,
+  getCardDisplayName,
   getPlayerOrdinaryTypeCounts,
+  PlayedCardHistoryEntry,
 } from '../models/types';
 import { AudioService, HapticService } from '../services/soundSynthesizer';
 import {
@@ -1167,3 +1171,756 @@ export const VictoryOverlay: React.FC<{
     </div>
   );
 };
+
+export interface MomentumScrollHandle {
+  scrollToOffset: (targetLeft: number, durationMs?: number) => void;
+  scrollToIndex: (index: number, durationMs?: number) => void;
+}
+
+interface MomentumScrollContainerProps {
+  itemCount: number;
+  snapStepPx: number;
+  onScrollStateChange?: (state: {
+    activeIndex: number;
+    canScrollLeft: boolean;
+    canScrollRight: boolean;
+  }) => void;
+  scrollHandleRef?: React.MutableRefObject<MomentumScrollHandle | null>;
+  className?: string;
+  trackClassName?: string;
+  children: React.ReactNode;
+}
+
+/**
+ * Momentum-based horizontal scroll container engineered for mobile touch ergonomics.
+ * Features:
+ * - 80ms windowed pointer velocity sampling for natural flick recognition
+ * - Frame-rate independent exponential friction decay + magnetic card-slot settling
+ * - Rubber-band edge overscroll resistance and spring-back
+ * - Automatic axis projection for both native landscape and 90°-rotated portrait viewports
+ */
+export const MomentumScrollContainer: React.FC<MomentumScrollContainerProps> = ({
+  itemCount,
+  snapStepPx,
+  onScrollStateChange,
+  scrollHandleRef,
+  className = '',
+  trackClassName = '',
+  children,
+}) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const [overscrollPx, setOverscrollPx] = useState(0);
+  const overscrollRef = useRef(0);
+  const lastReportedIdxRef = useRef(0);
+
+  const gestureRef = useRef<{
+    isDown: boolean;
+    isDragging: boolean;
+    suppressNextClick: boolean;
+    pointerId: number | null;
+    startClientX: number;
+    startClientY: number;
+    startScrollLeft: number;
+    virtualScrollLeft: number;
+    isRotatedPortrait: boolean;
+    samples: Array<{ pos: number; time: number }>;
+  }>({
+    isDown: false,
+    isDragging: false,
+    suppressNextClick: false,
+    pointerId: null,
+    startClientX: 0,
+    startClientY: 0,
+    startScrollLeft: 0,
+    virtualScrollLeft: 0,
+    isRotatedPortrait: false,
+    samples: [],
+  });
+
+  const cancelMomentumLoop = useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+  }, []);
+
+  const setRubberOverscroll = useCallback((val: number) => {
+    const rounded = Math.abs(val) < 0.25 ? 0 : val;
+    if (overscrollRef.current !== rounded) {
+      overscrollRef.current = rounded;
+      setOverscrollPx(rounded);
+    }
+  }, []);
+
+  const reportScrollMetrics = useCallback(
+    (triggerHapticOnSnapChange = false) => {
+      const el = containerRef.current;
+      if (!el) return;
+      const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+      const current = el.scrollLeft;
+      const canLeft = current > 4;
+      const canRight = current < maxScroll - 4;
+      const activeIdx =
+        itemCount > 0
+          ? Math.min(itemCount - 1, Math.max(0, Math.round(current / snapStepPx)))
+          : 0;
+
+      if (triggerHapticOnSnapChange && activeIdx !== lastReportedIdxRef.current) {
+        HapticService.uiTap();
+      }
+      lastReportedIdxRef.current = activeIdx;
+
+      onScrollStateChange?.({
+        activeIndex: activeIdx,
+        canScrollLeft: canLeft,
+        canScrollRight: canRight,
+      });
+    },
+    [itemCount, onScrollStateChange, snapStepPx]
+  );
+
+  // Smooth spring-like animated scroll to a specific offset
+  const scrollToOffset = useCallback(
+    (targetLeft: number, durationMs = 340) => {
+      const el = containerRef.current;
+      if (!el) return;
+      cancelMomentumLoop();
+
+      const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+      const clampedTarget = Math.min(maxScroll, Math.max(0, targetLeft));
+      const startLeft = el.scrollLeft;
+      const startOverscroll = overscrollRef.current;
+      const delta = clampedTarget - startLeft;
+
+      if (Math.abs(delta) < 0.5 && Math.abs(startOverscroll) < 0.5) {
+        el.scrollLeft = clampedTarget;
+        setRubberOverscroll(0);
+        reportScrollMetrics(false);
+        return;
+      }
+
+      const startTime = performance.now();
+      const tick = (now: number) => {
+        const t = Math.min(1, Math.max(0, (now - startTime) / durationMs));
+        // Native-like critically damped spring approximation: 1 - (1 - t)^3.4
+        const eased = 1 - Math.pow(1 - t, 3.4);
+        el.scrollLeft = startLeft + delta * eased;
+        if (startOverscroll !== 0) {
+          setRubberOverscroll(startOverscroll * (1 - eased));
+        }
+        reportScrollMetrics(false);
+
+        if (t < 1) {
+          rafRef.current = requestAnimationFrame(tick);
+        } else {
+          setRubberOverscroll(0);
+          rafRef.current = null;
+        }
+      };
+
+      rafRef.current = requestAnimationFrame(tick);
+    },
+    [cancelMomentumLoop, reportScrollMetrics, setRubberOverscroll]
+  );
+
+  const scrollToIndex = useCallback(
+    (index: number, durationMs = 320) => {
+      const clampedIdx = Math.min(Math.max(0, index), Math.max(0, itemCount - 1));
+      scrollToOffset(clampedIdx * snapStepPx, durationMs);
+    },
+    [itemCount, scrollToOffset, snapStepPx]
+  );
+
+  // Start kinetic momentum decay loop after touch release
+  const startInertialMomentum = useCallback(
+    (initialVelocityPxPerMs: number) => {
+      const el = containerRef.current;
+      if (!el) return;
+      cancelMomentumLoop();
+
+      const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+
+      // If currently overscrolled at release, smoothly spring back to nearest boundary
+      if (Math.abs(overscrollRef.current) > 0.5) {
+        const boundaryTarget = overscrollRef.current > 0 ? 0 : maxScroll;
+        scrollToOffset(boundaryTarget, 280);
+        return;
+      }
+
+      // Compute natural momentum landing position and snap to the nearest card slot
+      // v_0 / (1 - friction) projects total inertial travel distance
+      const FRICTION_PER_FRAME = 0.92;
+      const projectedDistance = (initialVelocityPxPerMs * 16.67) / (1 - FRICTION_PER_FRAME);
+      const rawTarget = el.scrollLeft + projectedDistance;
+      const clampedRawTarget = Math.min(maxScroll, Math.max(0, rawTarget));
+      const targetIndex =
+        snapStepPx > 0
+          ? Math.min(
+              Math.max(0, Math.round(clampedRawTarget / snapStepPx)),
+              Math.max(0, itemCount - 1)
+            )
+          : 0;
+      const snapTargetLeft = Math.min(maxScroll, Math.max(0, targetIndex * snapStepPx));
+
+      let currentPos = el.scrollLeft;
+      let velocity = initialVelocityPxPerMs; // px/ms
+      let lastTime = performance.now();
+
+      const step = (now: number) => {
+        const dt = Math.min(34, Math.max(1, now - lastTime));
+        lastTime = now;
+        const frameScale = dt / 16.67;
+
+        // Blend inertial velocity with spring attraction toward snapTargetLeft
+        const remaining = snapTargetLeft - currentPos;
+        velocity *= Math.pow(FRICTION_PER_FRAME, frameScale);
+        const springPull = remaining * 0.14 * frameScale;
+        currentPos += velocity * dt * 0.45 + springPull;
+
+        // Apply subtle rubber-band if momentum briefly kisses an edge
+        if (currentPos < 0) {
+          el.scrollLeft = 0;
+          setRubberOverscroll(-currentPos * 0.25);
+          velocity *= 0.5;
+        } else if (currentPos > maxScroll) {
+          el.scrollLeft = maxScroll;
+          setRubberOverscroll((maxScroll - currentPos) * 0.25);
+          velocity *= 0.5;
+        } else {
+          el.scrollLeft = currentPos;
+          if (overscrollRef.current !== 0) {
+            setRubberOverscroll(overscrollRef.current * 0.7);
+          }
+        }
+
+        reportScrollMetrics(true);
+
+        if (Math.abs( snapTargetLeft - currentPos) > 0.6 || Math.abs(velocity) > 0.02) {
+          rafRef.current = requestAnimationFrame(step);
+        } else {
+          el.scrollLeft = snapTargetLeft;
+          setRubberOverscroll(0);
+          reportScrollMetrics(false);
+          rafRef.current = null;
+        }
+      };
+
+      rafRef.current = requestAnimationFrame(step);
+    },
+    [cancelMomentumLoop, itemCount, reportScrollMetrics, scrollToOffset, setRubberOverscroll, snapStepPx]
+  );
+
+  useEffect(() => {
+    if (scrollHandleRef) {
+      scrollHandleRef.current = {
+        scrollToOffset,
+        scrollToIndex,
+      };
+    }
+  }, [scrollHandleRef, scrollToIndex, scrollToOffset]);
+
+  useEffect(() => {
+    reportScrollMetrics(false);
+    return () => cancelMomentumLoop();
+  }, [cancelMomentumLoop, itemCount, reportScrollMetrics]);
+
+  const getProjectedAxisPos = (clientX: number, clientY: number, isRotatedPortrait: boolean) =>
+    isRotatedPortrait ? clientY : clientX;
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = containerRef.current;
+    if (!el) return;
+    cancelMomentumLoop();
+
+    const isRotatedPortrait = window.innerWidth < window.innerHeight;
+    const axisPos = getProjectedAxisPos(e.clientX, e.clientY, isRotatedPortrait);
+    const now = performance.now();
+
+    gestureRef.current = {
+      isDown: true,
+      isDragging: false,
+      suppressNextClick: false,
+      pointerId: e.pointerId,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startScrollLeft: el.scrollLeft - overscrollRef.current,
+      virtualScrollLeft: el.scrollLeft - overscrollRef.current,
+      isRotatedPortrait,
+      samples: [{ pos: axisPos, time: now }],
+    };
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const g = gestureRef.current;
+    const el = containerRef.current;
+    if (!g.isDown || !el) return;
+
+    const axisPos = getProjectedAxisPos(e.clientX, e.clientY, g.isRotatedPortrait);
+    const startAxisPos = getProjectedAxisPos(g.startClientX, g.startClientY, g.isRotatedPortrait);
+    const deltaFromStart = axisPos - startAxisPos;
+
+    // Engage drag capture only after crossing 5px touch slop threshold
+    if (!g.isDragging) {
+      if (Math.abs(deltaFromStart) < 5) return;
+      g.isDragging = true;
+      g.suppressNextClick = true;
+      try {
+        el.setPointerCapture(e.pointerId!);
+      } catch {
+        // ignore if unsupported
+      }
+    }
+
+    const now = performance.now();
+    g.samples.push({ pos: axisPos, time: now });
+    // Keep only samples within the last 85ms for accurate flick release velocity
+    const cutoff = now - 85;
+    while (g.samples.length > 2 && g.samples[0].time < cutoff) {
+      g.samples.shift();
+    }
+
+    const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+    const desiredScroll = g.startScrollLeft - deltaFromStart;
+    g.virtualScrollLeft = desiredScroll;
+
+    if (desiredScroll < 0) {
+      el.scrollLeft = 0;
+      // Rubber-band resistance at left boundary
+      setRubberOverscroll(-desiredScroll * 0.34);
+    } else if (desiredScroll > maxScroll) {
+      el.scrollLeft = maxScroll;
+      // Rubber-band resistance at right boundary
+      setRubberOverscroll((maxScroll - desiredScroll) * 0.34);
+    } else {
+      el.scrollLeft = desiredScroll;
+      setRubberOverscroll(0);
+    }
+
+    reportScrollMetrics(true);
+  };
+
+  const handlePointerUpOrCancel = () => {
+    const g = gestureRef.current;
+    const el = containerRef.current;
+    if (!g.isDown || !el) return;
+    g.isDown = false;
+
+    try {
+      if (g.pointerId !== null && el.hasPointerCapture(g.pointerId)) {
+        el.releasePointerCapture(g.pointerId);
+      }
+    } catch {
+      // ignore
+    }
+
+    if (!g.isDragging) {
+      if (Math.abs(overscrollRef.current) > 0.5) {
+        const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+        scrollToOffset(overscrollRef.current > 0 ? 0 : maxScroll, 250);
+      }
+      return;
+    }
+
+    g.isDragging = false;
+    const now = performance.now();
+    const samples = g.samples;
+    let releaseVelocity = 0; // positive = scrolling right (scrollLeft increasing)
+
+    if (samples.length >= 2) {
+      const newest = samples[samples.length - 1];
+      // If user held finger stationary for > 65ms before lifting, zero out flick velocity
+      if (now - newest.time <= 65) {
+        const oldest = samples[0];
+        const dt = Math.max(1, newest.time - oldest.time);
+        const pointerVelocity = (newest.pos - oldest.pos) / dt;
+        releaseVelocity = -pointerVelocity;
+      }
+    }
+
+    startInertialMomentum(releaseVelocity);
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    const el = containerRef.current;
+    if (!el) return;
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (Math.abs(delta) < 1) return;
+    e.preventDefault();
+    startInertialMomentum((delta / 16.67) * 0.35);
+  };
+
+  const handleClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (gestureRef.current.suppressNextClick) {
+      gestureRef.current.suppressNextClick = false;
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      onScroll={() => {
+        if (!gestureRef.current.isDown && rafRef.current === null) {
+          reportScrollMetrics(false);
+        }
+      }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUpOrCancel}
+      onPointerCancel={handlePointerUpOrCancel}
+      onClickCapture={handleClickCapture}
+      onWheel={handleWheel}
+      style={{
+        WebkitOverflowScrolling: 'touch',
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
+        touchAction: 'pan-x',
+        overscrollBehaviorX: 'contain',
+      }}
+      className={`overflow-x-auto select-none cursor-grab active:cursor-grabbing ${className}`}
+    >
+      <div
+        style={{
+          transform:
+            overscrollPx !== 0 ? `translate3d(${overscrollPx}px, 0, 0)` : 'translate3d(0, 0, 0)',
+          willChange: 'transform',
+        }}
+        className={`flex flex-row items-stretch ${trackClassName}`}
+      >
+        {children}
+      </div>
+    </div>
+  );
+};
+
+// 8. Small, Momentum-Scrollable Last 5 Cards Played History Overlay
+export const PlayedCardsHistoryOverlay: React.FC<{
+  recentPlayedCards: PlayedCardHistoryEntry[];
+  currentTableCardName: string;
+  onClose: () => void;
+}> = ({ recentPlayedCards, currentTableCardName, onClose }) => {
+  const orderedEntries = [...recentPlayedCards].reverse();
+  const momentumHandleRef = useRef<MomentumScrollHandle | null>(null);
+
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(orderedEntries.length > 2);
+  const [isEntered, setIsEntered] = useState(false);
+
+  const CARD_STEP_PX = 166; // 156px card width + 10px gap
+
+  const handleScrollStateChange = useCallback(
+    ({
+      activeIndex: nextIdx,
+      canScrollLeft: nextLeft,
+      canScrollRight: nextRight,
+    }: {
+      activeIndex: number;
+      canScrollLeft: boolean;
+      canScrollRight: boolean;
+    }) => {
+      setActiveIndex(nextIdx);
+      setCanScrollLeft(nextLeft);
+      setCanScrollRight(nextRight);
+    },
+    []
+  );
+
+  const scrollToCardIndex = useCallback(
+    (index: number) => {
+      const clampedIdx = Math.min(Math.max(0, index), Math.max(0, orderedEntries.length - 1));
+      setActiveIndex(clampedIdx);
+      momentumHandleRef.current?.scrollToIndex(clampedIdx, 320);
+    },
+    [orderedEntries.length]
+  );
+
+  useEffect(() => {
+    const enterRaf = requestAnimationFrame(() => setIsEntered(true));
+    return () => cancelAnimationFrame(enterRaf);
+  }, []);
+
+  return (
+    <div
+      onClick={() => {
+        AudioService.playButtonClick();
+        HapticService.uiTap();
+        onClose();
+      }}
+      className="fixed inset-0 z-50 bg-black/45 backdrop-blur-[1.5px] flex items-start justify-end p-2 sm:p-4 select-none"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          boxShadow: '0 18px 40px rgba(0,0,0,0.75), 0 0 18px rgba(212, 175, 55, 0.18)',
+          transform: isEntered
+            ? 'translate3d(0, 0, 0) scale(1)'
+            : 'translate3d(0, -8px, 0) scale(0.96)',
+          opacity: isEntered ? 1 : 0,
+          transition:
+            'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease-out',
+        }}
+        className="w-full max-w-[390px] sm:max-w-[470px] mt-1 sm:mt-2 mr-0.5 sm:mr-2 bg-[#0F172A]/95 border-[1.5px] border-[#D4AF37]/85 rounded-2xl p-2.5 sm:p-3.5 flex flex-col overflow-hidden"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between gap-2 pb-2 border-b border-white/10 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-[#FFD54F]/15 border border-[#FFD54F]/45 flex items-center justify-center shrink-0">
+              <RotateCcw size={15} className="text-[#FFD54F]" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-[#FFD700] text-xs sm:text-[13px] font-black tracking-wider uppercase truncate">
+                  Last 5 Cards Played
+                </h3>
+                <span className="px-1.5 py-0.5 rounded-full bg-[#D97706]/30 border border-[#FFD54F]/40 text-[#FFE082] text-[9.5px] font-black tabular-nums">
+                  {orderedEntries.length}/5
+                </span>
+              </div>
+              <div className="text-white/60 text-[10px] truncate">
+                On Table Now:{' '}
+                <span className="text-[#FFE082] font-bold">{currentTableCardName}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            {orderedEntries.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  disabled={!canScrollLeft && activeIndex <= 0}
+                  onClick={() => {
+                    AudioService.playButtonClick();
+                    HapticService.uiTap();
+                    scrollToCardIndex(activeIndex - 1);
+                  }}
+                  className={`w-6 h-6 rounded-full border flex items-center justify-center transition ${
+                    canScrollLeft || activeIndex > 0
+                      ? 'bg-white/10 hover:bg-white/20 border-[#FFD54F]/40 text-[#FFD54F] cursor-pointer active:scale-95'
+                      : 'bg-white/[0.03] border-white/10 text-white/25 cursor-default'
+                  }`}
+                  title="Previous Card"
+                  aria-label="Scroll Left"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <button
+                  type="button"
+                  disabled={!canScrollRight && activeIndex >= orderedEntries.length - 1}
+                  onClick={() => {
+                    AudioService.playButtonClick();
+                    HapticService.uiTap();
+                    scrollToCardIndex(activeIndex + 1);
+                  }}
+                  className={`w-6 h-6 rounded-full border flex items-center justify-center transition ${
+                    canScrollRight || activeIndex < orderedEntries.length - 1
+                      ? 'bg-white/10 hover:bg-white/20 border-[#FFD54F]/40 text-[#FFD54F] cursor-pointer active:scale-95'
+                      : 'bg-white/[0.03] border-white/10 text-white/25 cursor-default'
+                  }`}
+                  title="Next Card"
+                  aria-label="Scroll Right"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                AudioService.playButtonClick();
+                HapticService.uiTap();
+                onClose();
+              }}
+              className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white flex items-center justify-center transition cursor-pointer shrink-0 ml-0.5"
+              title="Close History"
+              aria-label="Close History"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+
+        {/* Momentum-Based Horizontally Scrollable Last 5 Cards Carousel */}
+        {orderedEntries.length === 0 ? (
+          <div className="mt-2.5 py-5 px-3 rounded-xl bg-white/[0.03] border border-white/10 text-center">
+            <Layers size={22} className="text-[#FFD54F]/60 mx-auto mb-1.5" />
+            <div className="text-white/85 text-xs font-bold">No Cards Played Yet</div>
+            <div className="text-white/55 text-[10.5px] mt-0.5 leading-snug">
+              As soon as players trade cards with the table, the last 5 cards played will appear here.
+            </div>
+          </div>
+        ) : (
+          <div className="relative mt-2.5">
+            {/* Left Edge Fade Indicator */}
+            {canScrollLeft && (
+              <div
+                style={{
+                  background:
+                    'linear-gradient(90deg, rgba(15,23,42,0.95) 0%, rgba(15,23,42,0) 100%)',
+                }}
+                className="pointer-events-none absolute left-0 top-0 bottom-0 w-5 z-10 rounded-l-xl"
+              />
+            )}
+
+            {/* Right Edge Fade Indicator */}
+            {canScrollRight && (
+              <div
+                style={{
+                  background:
+                    'linear-gradient(270deg, rgba(15,23,42,0.95) 0%, rgba(15,23,42,0) 100%)',
+                }}
+                className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 z-10 rounded-r-xl"
+              />
+            )}
+
+            <MomentumScrollContainer
+              itemCount={orderedEntries.length}
+              snapStepPx={CARD_STEP_PX}
+              scrollHandleRef={momentumHandleRef}
+              onScrollStateChange={handleScrollStateChange}
+              className="pb-1 pt-0.5 px-0.5"
+              trackClassName="gap-2.5"
+            >
+              {orderedEntries.map((entry, idx) => {
+                const isLatest = idx === 0;
+                const isActive = idx === activeIndex;
+                const playedName = getCardDisplayName(entry.playedCard);
+                const takenName = getCardDisplayName(entry.takenCard);
+                const playedMeta =
+                  !entry.playedCard.isStartingCard && entry.playedCard.type
+                    ? COUNTRY_METADATA[entry.playedCard.type]
+                    : null;
+
+                return (
+                  <div
+                    key={`${entry.turnNumber}_${entry.playedCard.id}`}
+                    onClick={() => {
+                      if (idx !== activeIndex) {
+                        HapticService.uiTap();
+                        scrollToCardIndex(idx);
+                      }
+                    }}
+                    style={{
+                      transform: isEntered
+                        ? 'translate3d(0, 0, 0)'
+                        : `translate3d(${16 * (idx + 1)}px, 0, 0)`,
+                      transition: `transform ${220 + idx * 45}ms cubic-bezier(0.22, 1, 0.36, 1), border-color 180ms ease, background-color 180ms ease`,
+                    }}
+                    className={`w-[156px] shrink-0 p-2 rounded-xl border flex flex-col justify-between gap-1.5 ${
+                      isLatest
+                        ? 'bg-[#1E293B]/95 border-[#FFD54F]/75 shadow-sm'
+                        : isActive
+                          ? 'bg-[#1E293B]/75 border-[#FFD54F]/45'
+                          : 'bg-white/[0.04] border-white/10'
+                    }`}
+                  >
+                    {/* Top Row: Player Avatar + Name + Turn Badge */}
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="w-4 h-4 rounded-full overflow-hidden border border-[#FFD54F]/50 shrink-0">
+                          <AvatarSvg
+                            avatarIndex={entry.playerId}
+                            isMe={entry.isHuman}
+                            size={16}
+                          />
+                        </div>
+                        <span
+                          className={`text-[11px] font-extrabold truncate ${
+                            entry.isHuman ? 'text-[#FFD700]' : 'text-white'
+                          }`}
+                        >
+                          {entry.playerName}
+                        </span>
+                      </div>
+
+                      <span className="px-1.5 py-0.5 rounded bg-black/45 border border-white/10 text-white/70 text-[8.5px] font-bold tabular-nums shrink-0">
+                        #{entry.turnNumber}
+                      </span>
+                    </div>
+
+                    {/* Middle Row: Mini Card Visual + Played Country Info */}
+                    <div className="flex items-center gap-2 py-0.5">
+                      <div className="shrink-0">
+                        <CountryCardView
+                          card={entry.playedCard}
+                          width={34}
+                          height={52}
+                        />
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        {isLatest ? (
+                          <span className="inline-block px-1.5 py-0.2 mb-0.5 rounded bg-[#D97706] text-white text-[8px] font-black tracking-wider uppercase">
+                            LATEST
+                          </span>
+                        ) : (
+                          <div className="text-white/50 text-[8.5px] font-bold uppercase tracking-wider">
+                            Played Card
+                          </div>
+                        )}
+                        <div
+                          style={{
+                            color: playedMeta ? playedMeta.accentColor : '#6EE7B7',
+                          }}
+                          className="text-[11px] font-extrabold leading-tight truncate"
+                        >
+                          {playedName}
+                        </div>
+                        {playedMeta && (
+                          <div className="text-white/60 text-[9px] font-bold">
+                            {playedMeta.shortCode}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Bottom Row: Taken From Table */}
+                    <div className="pt-1 border-t border-white/10 flex items-center justify-between gap-1 text-[9.5px] text-white/55">
+                      <span className="shrink-0">Took:</span>
+                      <span className="text-white/85 font-semibold truncate">{takenName}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </MomentumScrollContainer>
+
+            {/* Interactive Pagination Dots & Swipe Hint for Mobile Touch Devices */}
+            <div className="mt-1.5 flex items-center justify-between gap-2 px-0.5">
+              <span className="text-white/45 text-[9.5px] font-medium">
+                Swipe left/right to browse moves
+              </span>
+              <div className="flex items-center gap-1">
+                {orderedEntries.map((entry, idx) => {
+                  const active = idx === activeIndex;
+                  return (
+                    <button
+                      key={`dot_${entry.turnNumber}_${idx}`}
+                      type="button"
+                      onClick={() => {
+                        HapticService.uiTap();
+                        scrollToCardIndex(idx);
+                      }}
+                      className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                        active
+                          ? 'w-4 bg-[#FFD54F]'
+                          : 'w-1.5 bg-white/25 hover:bg-white/45'
+                      }`}
+                      aria-label={`Jump to card ${idx + 1}`}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+
+

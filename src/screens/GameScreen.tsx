@@ -4,6 +4,7 @@ import {
   CelebrationParticlesCanvas,
   ExitConfirmationDialog,
   GameControlsDialog,
+  PlayedCardsHistoryOverlay,
   PlayerStatsOverlay,
   TutorialModalOverlay,
   VictoryOverlay,
@@ -19,6 +20,7 @@ import {
   GameCard,
   GameSettings,
   GameState,
+  getCardDisplayName,
   isLegalDiscard,
 } from '../models/types';
 import { AudioService, HapticService } from '../services/soundSynthesizer';
@@ -29,6 +31,7 @@ interface GameScreenProps {
   predefinedTypes?: CountryType[];
   settings: GameSettings;
   onUpdateSettings: (newSettings: GameSettings) => void;
+  onNavigateBack: () => void;
   onExitToMainMenu: () => void;
 }
 
@@ -146,6 +149,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
   predefinedTypes,
   settings,
   onUpdateSettings,
+  onNavigateBack,
   onExitToMainMenu,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -169,6 +173,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
   const [showExitConfirmDialog, setShowExitConfirmDialog] = useState(false);
   const [showPauseDialog, setShowPauseDialog] = useState(false);
+  const [showHistoryOverlay, setShowHistoryOverlay] = useState(false);
   const [showStatsOverlay, setShowStatsOverlay] = useState(false);
   const [showTutorialOverlay, setShowTutorialOverlay] = useState<boolean>(
     () => !StatsService.hasSeenTutorial()
@@ -183,6 +188,19 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
   const recordedWinRef = useRef(false);
   const isProcessingMoveRef = useRef(false);
+  const dealingProgressRef = useRef(0);
+  const playedDealSoundRef = useRef(false);
+  const exchangeProgressRef = useRef(0);
+  const playedExchangeLandingRef = useRef(false);
+  const playedExchangeOutgoingRef = useRef(false);
+
+  const isGamePaused =
+    isDocumentHidden ||
+    showTutorialOverlay ||
+    showPauseDialog ||
+    showExitConfirmDialog ||
+    showHistoryOverlay ||
+    showStatsOverlay;
 
   // Measure viewport to scale 1920x1080 stage cleanly on all mobile orientations
   useEffect(() => {
@@ -217,9 +235,12 @@ export const GameScreen: React.FC<GameScreenProps> = ({
       setIsDocumentHidden(document.hidden);
     };
     const onHardwareBack = () => {
-      if (showStatsOverlay) {
+      if (showHistoryOverlay) {
+        setShowHistoryOverlay(false);
+      } else if (showStatsOverlay) {
         setShowStatsOverlay(false);
       } else if (showTutorialOverlay) {
+        StatsService.markTutorialSeen();
         setShowTutorialOverlay(false);
       } else if (showPauseDialog) {
         setShowPauseDialog(false);
@@ -235,31 +256,50 @@ export const GameScreen: React.FC<GameScreenProps> = ({
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('ccg-hardware-back', onHardwareBack);
     };
-  }, [showStatsOverlay, showTutorialOverlay, showPauseDialog, showExitConfirmDialog]);
+  }, [
+    showHistoryOverlay,
+    showStatsOverlay,
+    showTutorialOverlay,
+    showPauseDialog,
+    showExitConfirmDialog,
+  ]);
 
   // Record initial game started
   useEffect(() => {
     StatsService.recordGameStarted(state.players);
-    if (!StatsService.hasSeenTutorial()) {
-      StatsService.markTutorialSeen();
-    }
-    if (settings.animationsEnabled) {
-      AudioService.playExchange();
-    } else {
+    if (!settings.animationsEnabled && !showTutorialOverlay) {
+      playedDealSoundRef.current = true;
       AudioService.playGameStart();
+      HapticService.dealShuffle();
     }
-    HapticService.dealShuffle();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Dealing animation loop
+  // Dealing animation loop (pauses cleanly while Tutorial or any modal is open and resumes from exact progress)
   useEffect(() => {
-    if (!isDealing) return;
+    if (isGamePaused) return;
+    if (!isDealing) {
+      if (!playedDealSoundRef.current) {
+        playedDealSoundRef.current = true;
+        AudioService.playGameStart();
+        HapticService.dealShuffle();
+      }
+      return;
+    }
+
+    if (!playedDealSoundRef.current) {
+      playedDealSoundRef.current = true;
+      AudioService.playExchange();
+      HapticService.dealShuffle();
+    }
+
     let animId = 0;
-    const start = performance.now();
     const duration = 1350;
+    const start = performance.now() - dealingProgressRef.current * duration;
 
     const tick = (now: number) => {
       const p = Math.min(1, Math.max(0, (now - start) / duration));
+      dealingProgressRef.current = p;
       setDealingProgress(p);
       if (p >= 1) {
         setIsDealing(false);
@@ -269,33 +309,35 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     };
     animId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animId);
-  }, [isDealing]);
+  }, [isDealing, isGamePaused]);
 
-  // Exchange animation loop
+  // Exchange animation loop (pauses cleanly while Tutorial or any modal is open and resumes from exact progress)
   useEffect(() => {
-    if (!isAnimatingExchange) return;
+    if (!isAnimatingExchange || isGamePaused) return;
     let animId = 0;
-    const start = performance.now();
     const duration = 1020;
-    let playedLanding = false;
-    let playedOutgoing = false;
+    const start = performance.now() - exchangeProgressRef.current * duration;
 
     const tick = (now: number) => {
       const p = Math.min(1, Math.max(0, (now - start) / duration));
+      exchangeProgressRef.current = p;
       setExchangeProgress(p);
 
-      if (!playedLanding && p >= 0.44) {
-        playedLanding = true;
+      if (!playedExchangeLandingRef.current && p >= 0.44) {
+        playedExchangeLandingRef.current = true;
         AudioService.playCardPlace();
         HapticService.botTurnTick();
       }
-      if (!playedOutgoing && p >= 0.56) {
-        playedOutgoing = true;
+      if (!playedExchangeOutgoingRef.current && p >= 0.56) {
+        playedExchangeOutgoingRef.current = true;
         AudioService.playCardTake();
       }
 
       if (p >= 1) {
         isProcessingMoveRef.current = false;
+        exchangeProgressRef.current = 0;
+        playedExchangeLandingRef.current = false;
+        playedExchangeOutgoingRef.current = false;
         setIsAnimatingExchange(false);
         setAnimatingPlayerIndex(null);
         setAnimatingHandIndex(null);
@@ -307,7 +349,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     };
     animId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animId);
-  }, [isAnimatingExchange]);
+  }, [isAnimatingExchange, isGamePaused]);
 
   // Post-exchange victory / turn cues
   useEffect(() => {
@@ -335,7 +377,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
   const performMove = useCallback(
     (card: GameCard) => {
-      if (isProcessingMoveRef.current || isDealing || isAnimatingExchange) {
+      if (isProcessingMoveRef.current || isDealing || isAnimatingExchange || isGamePaused) {
         return false;
       }
       const { nextState, isValid } = executeGameMove(state, card);
@@ -363,6 +405,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         const pIdx = nextState.lastMovePlayerIndex;
         const hIdx = nextState.lastMoveHandIndex ?? 0;
 
+        exchangeProgressRef.current = 0;
+        playedExchangeLandingRef.current = false;
+        playedExchangeOutgoingRef.current = false;
         setAnimatingPlayerIndex(pIdx);
         setAnimatingHandIndex(hIdx);
         setAnimatingDiscardedCard(nextState.lastDiscardedCard);
@@ -387,21 +432,15 @@ export const GameScreen: React.FC<GameScreenProps> = ({
       setState(nextState);
       return true;
     },
-    [isDealing, isAnimatingExchange, settings.animationsEnabled, state]
+    [isDealing, isAnimatingExchange, isGamePaused, settings.animationsEnabled, state]
   );
 
   // Bot turn scheduler
   useEffect(() => {
-    const isPaused =
-      isDocumentHidden ||
-      showExitConfirmDialog ||
-      showPauseDialog ||
-      showStatsOverlay ||
-      showTutorialOverlay;
     if (
       isDealing ||
       isAnimatingExchange ||
-      isPaused ||
+      isGamePaused ||
       state.winner !== null ||
       state.players[state.currentTurnPlayerIndex].isHuman
     ) {
@@ -428,11 +467,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
   }, [
     isDealing,
     isAnimatingExchange,
-    isDocumentHidden,
-    showExitConfirmDialog,
-    showPauseDialog,
-    showStatsOverlay,
-    showTutorialOverlay,
+    isGamePaused,
     state,
     settings.botDelayMs,
     settings.animationsEnabled,
@@ -442,6 +477,11 @@ export const GameScreen: React.FC<GameScreenProps> = ({
   const handleRestartMatch = () => {
     recordedWinRef.current = false;
     isProcessingMoveRef.current = false;
+    dealingProgressRef.current = 0;
+    playedDealSoundRef.current = false;
+    exchangeProgressRef.current = 0;
+    playedExchangeLandingRef.current = false;
+    playedExchangeOutgoingRef.current = false;
     const fresh = createInitialGameState(totalPlayers, predefinedTypes);
     setState(fresh);
     setIsAnimatingExchange(false);
@@ -449,12 +489,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     if (settings.animationsEnabled) {
       setDealingProgress(0);
       setIsDealing(true);
-      AudioService.playExchange();
     } else {
       setIsDealing(false);
-      AudioService.playGameStart();
     }
-    HapticService.dealShuffle();
   };
 
   const humanPlayer = state.players[0];
@@ -473,6 +510,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     !isAnimatingExchange &&
     !showExitConfirmDialog &&
     !showPauseDialog &&
+    !showHistoryOverlay &&
     !showStatsOverlay &&
     !showTutorialOverlay &&
     state.winner === null &&
@@ -581,33 +619,46 @@ export const GameScreen: React.FC<GameScreenProps> = ({
           </svg>
         </button>
 
-        {/* Top-Right Player Stats Button */}
+        {/* Top-Right Recent Cards History Button (replaces Player Stats & Sets on play screen) */}
         <button
           onClick={() => {
             AudioService.playButtonClick();
             HapticService.uiTap();
-            setShowStatsOverlay(true);
+            setShowHistoryOverlay((prev) => !prev);
           }}
           style={{ left: '1676px', top: '60px', width: '68px', height: '68px' }}
           className="absolute rounded-full bg-white border-2 border-[#DAD3F5] flex items-center justify-center hover:scale-105 transition cursor-pointer shadow"
-          title="Player Stats & Sets"
+          title="Last 5 Cards Played"
+          aria-label="Last 5 Cards Played"
         >
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
             <path
-              d="M7 4h10v5.5Q17 14.5 12 14.5Q7 14.5 7 9.5Z"
+              d="M3 12a9 9 0 1 0 3-6.7L3 8"
               stroke="#2A2160"
-              strokeWidth="2.2"
+              strokeWidth="2.3"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
             <path
-              d="M7 6H4.2Q4.2 10.5 7 10.5M17 6h2.8Q19.8 10.5 17 10.5M12 14.5v5M8 19.5h8"
+              d="M3 3v5h5"
               stroke="#2A2160"
-              strokeWidth="2.2"
+              strokeWidth="2.3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M12 7.5V12l3 2"
+              stroke="#2A2160"
+              strokeWidth="2.3"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
           </svg>
+          {state.recentPlayedCards.length > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] px-1 rounded-full bg-[#D97706] border-2 border-white text-white text-[11px] font-black flex items-center justify-center tabular-nums shadow">
+              {state.recentPlayedCards.length}
+            </span>
+          )}
         </button>
 
         {/* Top-Right Settings Button (opens GAME PAUSED panel) */}
@@ -849,7 +900,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
           onStayInGame={() => setShowExitConfirmDialog(false)}
           onExitGame={() => {
             setShowExitConfirmDialog(false);
-            onExitToMainMenu();
+            onNavigateBack();
           }}
         />
       )}
@@ -880,6 +931,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
       )}
 
       {showVictoryModal &&
+        !showHistoryOverlay &&
         !showStatsOverlay &&
         !showTutorialOverlay &&
         state.winner &&
@@ -901,6 +953,14 @@ export const GameScreen: React.FC<GameScreenProps> = ({
           </>
         )}
 
+      {showHistoryOverlay && (
+        <PlayedCardsHistoryOverlay
+          recentPlayedCards={state.recentPlayedCards}
+          currentTableCardName={getCardDisplayName(state.tableCard)}
+          onClose={() => setShowHistoryOverlay(false)}
+        />
+      )}
+
       {showStatsOverlay && (
         <PlayerStatsOverlay
           activePlayers={state.players}
@@ -912,7 +972,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({
       {showTutorialOverlay && (
         <TutorialModalOverlay
           targetSetSize={state.totalPlayers}
-          onClose={() => setShowTutorialOverlay(false)}
+          onClose={() => {
+            StatsService.markTutorialSeen();
+            setShowTutorialOverlay(false);
+          }}
         />
       )}
     </div>

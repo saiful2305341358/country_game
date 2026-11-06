@@ -202,6 +202,23 @@ class GameEngine extends ChangeNotifier {
         ? <String>[...prevLogs.sublist(prevLogs.length - 23), logEntry]
         : <String>[...prevLogs, logEntry];
 
+    final historyEntry = PlayedCardHistoryEntry(
+      turnNumber: state.turnCount + 1,
+      playerId: activePlayer.id,
+      playerName: activePlayer.name,
+      isHuman: activePlayer.isHuman,
+      isFemale: activePlayer.isFemale,
+      playedCard: discardCard,
+      takenCard: oldTableCard,
+    );
+    final prevRecent = state.recentPlayedCards;
+    final newRecentPlayedCards = prevRecent.length >= 5
+        ? <PlayedCardHistoryEntry>[
+            ...prevRecent.sublist(prevRecent.length - 4),
+            historyEntry,
+          ]
+        : <PlayedCardHistoryEntry>[...prevRecent, historyEntry];
+
     final shouldLockForAnimation =
         waitForExchangeAnimation && _settings.animationsEnabled;
 
@@ -217,6 +234,7 @@ class GameEngine extends ChangeNotifier {
             ? '🏆 You collected all ${state.totalPlayers} ${winningType.displayName} cards and won the game!'
             : '🏆 ${updatedPlayer.name} collected all ${state.totalPlayers} ${winningType.displayName} cards and won the game!',
         moveLog: newMoveLog,
+        recentPlayedCards: newRecentPlayedCards,
         lastMovePlayerIndex: activePlayerIndex,
         lastMoveHandIndex: replacedIndex,
         lastTakenCard: oldTableCard,
@@ -246,6 +264,7 @@ class GameEngine extends ChangeNotifier {
       isOpeningMove: false,
       statusMessage: nextStatus,
       moveLog: newMoveLog,
+      recentPlayedCards: newRecentPlayedCards,
       lastMovePlayerIndex: activePlayerIndex,
       lastMoveHandIndex: replacedIndex,
       lastTakenCard: oldTableCard,

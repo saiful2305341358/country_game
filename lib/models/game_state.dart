@@ -4,6 +4,27 @@ import 'game_card.dart';
 import 'game_player.dart';
 
 @immutable
+class PlayedCardHistoryEntry {
+  final int turnNumber;
+  final int playerId;
+  final String playerName;
+  final bool isHuman;
+  final bool isFemale;
+  final GameCard playedCard;
+  final GameCard takenCard;
+
+  const PlayedCardHistoryEntry({
+    required this.turnNumber,
+    required this.playerId,
+    required this.playerName,
+    required this.isHuman,
+    required this.isFemale,
+    required this.playedCard,
+    required this.takenCard,
+  });
+}
+
+@immutable
 class GameState {
   final int totalPlayers;
   final List<CountryType> activeTypes;
@@ -17,6 +38,7 @@ class GameState {
   final CountryType? winningType;
   final String statusMessage;
   final List<String> moveLog;
+  final List<PlayedCardHistoryEntry> recentPlayedCards;
 
   /// Metadata for the most recent card exchange to drive 2D table animations.
   final int? lastMovePlayerIndex;
@@ -37,6 +59,7 @@ class GameState {
     this.winningType,
     required this.statusMessage,
     this.moveLog = const [],
+    this.recentPlayedCards = const [],
     this.lastMovePlayerIndex,
     this.lastMoveHandIndex,
     this.lastTakenCard,
@@ -89,6 +112,7 @@ class GameState {
     CountryType? winningType,
     String? statusMessage,
     List<String>? moveLog,
+    List<PlayedCardHistoryEntry>? recentPlayedCards,
     int? lastMovePlayerIndex,
     int? lastMoveHandIndex,
     GameCard? lastTakenCard,
@@ -108,6 +132,7 @@ class GameState {
       winningType: winningType ?? this.winningType,
       statusMessage: statusMessage ?? this.statusMessage,
       moveLog: moveLog ?? this.moveLog,
+      recentPlayedCards: recentPlayedCards ?? this.recentPlayedCards,
       lastMovePlayerIndex: lastMovePlayerIndex ?? this.lastMovePlayerIndex,
       lastMoveHandIndex: lastMoveHandIndex ?? this.lastMoveHandIndex,
       lastTakenCard: lastTakenCard ?? this.lastTakenCard,

@@ -10,6 +10,7 @@ import {
   getPlayerOrdinaryTypeCounts,
   getPlayerWinningType,
   isLegalDiscard,
+  PlayedCardHistoryEntry,
 } from '../models/types';
 
 const WESTERN_FEMALE_NAMES = [
@@ -405,6 +406,7 @@ export function createInitialGameState(
         ? 'You were selected to open with Global.'
         : `${startingPlayer.name} selected to open with Global.`,
     ],
+    recentPlayedCards: [],
     lastMovePlayerIndex: null,
     lastMoveHandIndex: null,
     lastTakenCard: null,
@@ -457,6 +459,17 @@ export function executeGameMove(
   const newMoveLog =
     prevLogs.length >= 24 ? [...prevLogs.slice(prevLogs.length - 23), logEntry] : [...prevLogs, logEntry];
 
+  const historyEntry: PlayedCardHistoryEntry = {
+    turnNumber: state.turnCount + 1,
+    playerId: activePlayer.id,
+    playerName: activePlayer.name,
+    isHuman: activePlayer.isHuman,
+    isFemale: activePlayer.isFemale,
+    playedCard: discardCard,
+    takenCard: oldTableCard,
+  };
+  const nextRecentPlayedCards = [...state.recentPlayedCards, historyEntry].slice(-5);
+
   if (hasWon && winningType) {
     const winName = COUNTRY_METADATA[winningType].displayName;
     return {
@@ -473,6 +486,7 @@ export function executeGameMove(
           ? `🏆 You collected all ${state.totalPlayers} ${winName} cards and won the game!`
           : `🏆 ${updatedPlayer.name} collected all ${state.totalPlayers} ${winName} cards and won the game!`,
         moveLog: newMoveLog,
+        recentPlayedCards: nextRecentPlayedCards,
         lastMovePlayerIndex: activePlayerIndex,
         lastMoveHandIndex: replacedIndex,
         lastTakenCard: oldTableCard,
@@ -498,6 +512,7 @@ export function executeGameMove(
       isOpeningMove: false,
       statusMessage: nextStatus,
       moveLog: newMoveLog,
+      recentPlayedCards: nextRecentPlayedCards,
       lastMovePlayerIndex: activePlayerIndex,
       lastMoveHandIndex: replacedIndex,
       lastTakenCard: oldTableCard,

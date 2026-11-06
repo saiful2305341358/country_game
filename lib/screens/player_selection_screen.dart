@@ -45,7 +45,7 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
   void _startGame() {
     AudioService.instance.playButtonClick();
     HapticService.instance.uiTap();
-    Navigator.pushReplacement(
+    Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => GameScreen(

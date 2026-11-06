@@ -7,16 +7,24 @@ import { COUNTRY_METADATA, CountryType } from '../models/types';
 import { AudioService, HapticService } from '../services/soundSynthesizer';
 
 interface PlayerSelectionScreenProps {
+  initialPlayers?: number;
+  initialActiveTypes?: CountryType[];
   onBack: () => void;
   onStartGame: (totalPlayers: number, activeTypes: CountryType[]) => void;
 }
 
 export const PlayerSelectionScreen: React.FC<PlayerSelectionScreenProps> = ({
+  initialPlayers = 4,
+  initialActiveTypes,
   onBack,
   onStartGame,
 }) => {
-  const [selectedPlayers, setSelectedPlayers] = useState<number>(4);
-  const [activeTypes, setActiveTypes] = useState<CountryType[]>(() => selectActiveTypes(4));
+  const [selectedPlayers, setSelectedPlayers] = useState<number>(initialPlayers);
+  const [activeTypes, setActiveTypes] = useState<CountryType[]>(() =>
+    initialActiveTypes && initialActiveTypes.length === initialPlayers
+      ? initialActiveTypes
+      : selectActiveTypes(initialPlayers)
+  );
 
   const handlePlayerCountChange = (count: number) => {
     if (count === selectedPlayers) return;

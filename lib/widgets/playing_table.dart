@@ -35,9 +35,10 @@ class PlayingTable extends StatefulWidget {
   final ValueChanged<GameCard> onCardSelected;
   final VoidCallback? onBack;
   final VoidCallback onPause;
-  final VoidCallback? onShowStats;
+  final VoidCallback? onShowHistory;
   final VoidCallback? onShowTutorial;
   final VoidCallback? onExchangeAnimationComplete;
+  final bool isPaused;
   final bool isProcessingMove;
   final bool isDealing;
   final double dealingProgress;
@@ -50,9 +51,10 @@ class PlayingTable extends StatefulWidget {
     required this.onCardSelected,
     this.onBack,
     required this.onPause,
-    this.onShowStats,
+    this.onShowHistory,
     this.onShowTutorial,
     this.onExchangeAnimationComplete,
+    this.isPaused = false,
     this.isProcessingMove = false,
     this.isDealing = false,
     this.dealingProgress = 1.0,
@@ -238,6 +240,22 @@ class _PlayingTableState extends State<PlayingTable>
       return;
     }
 
+    if (widget.isPaused && !oldWidget.isPaused) {
+      if (_isAnimatingExchange && _passController.isAnimating) {
+        _passController.stop(canceled: false);
+      }
+      return;
+    }
+
+    if (!widget.isPaused && oldWidget.isPaused) {
+      if (_isAnimatingExchange &&
+          !_passController.isAnimating &&
+          _passController.value < 1.0) {
+        _passController.forward();
+        return;
+      }
+    }
+
     // Prevent overlapping animations or restarting an active exchange mid-flight
     if (_isAnimatingExchange || _passController.isAnimating) {
       return;
@@ -278,7 +296,11 @@ class _PlayingTableState extends State<PlayingTable>
         _hasPlayedLandingCue = false;
         _hasPlayedOutgoingCue = false;
         _buildPassingCache();
-        _passController.forward(from: 0.0);
+        if (widget.isPaused) {
+          _passController.value = 0.0;
+        } else {
+          _passController.forward(from: 0.0);
+        }
       } else {
         _isAnimatingExchange = false;
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -470,20 +492,58 @@ class _PlayingTableState extends State<PlayingTable>
                         ),
                       ),
 
-                    // 2. Top-Right Player Stats & Sets Button (.btn at left: 1676px, top: 60px)
-                    if (widget.onShowStats != null)
+                    // 2. Top-Right Last 5 Cards Played History Button (.btn at left: 1676px, top: 60px)
+                    if (widget.onShowHistory != null)
                       Positioned(
                         left: 1676,
                         top: 60,
                         width: 68,
                         height: 68,
-                        child: _buildCircleButton(
-                          tooltip: 'Player Stats & Sets',
-                          onTap: widget.onShowStats!,
-                          child: const CustomPaint(
-                            size: Size(30, 30),
-                            painter: _StatsTrophyIconPainter(),
-                          ),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            _buildCircleButton(
+                              tooltip: 'Last 5 Cards Played',
+                              onTap: widget.onShowHistory!,
+                              child: const CustomPaint(
+                                size: Size(30, 30),
+                                painter: _HistoryClockIconPainter(),
+                              ),
+                            ),
+                            if (widget.state.recentPlayedCards.isNotEmpty)
+                              Positioned(
+                                right: -2,
+                                top: -2,
+                                child: IgnorePointer(
+                                  child: Container(
+                                    constraints: const BoxConstraints(
+                                      minWidth: 22,
+                                      minHeight: 22,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 5,
+                                    ),
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFD97706),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.white,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      '${widget.state.recentPlayedCards.length}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
 
@@ -611,7 +671,8 @@ class _PlayingTableState extends State<PlayingTable>
   Widget _buildIdleTableCard(BuildContext context, {required int slotIndex}) {
     final state = widget.state;
     final tableCard = state.tableCard;
-    final canInteract = !widget.isDealing &&
+    final canInteract = !widget.isPaused &&
+        !widget.isDealing &&
         !widget.isProcessingMove &&
         !_isAnimatingExchange &&
         state.isHumanTurn;
@@ -657,8 +718,10 @@ class _PlayingTableState extends State<PlayingTable>
       final isCurrentTurn = !widget.isDealing && activePlayerId == player.id;
       final isPlayerExchanging =
           _isAnimatingExchange && _animatingPlayerIndex == player.id;
-      final isThinking =
-          isCurrentTurn && !player.isHuman && !widget.state.isGameOver;
+      final isThinking = !widget.isPaused &&
+          isCurrentTurn &&
+          !player.isHuman &&
+          !widget.state.isGameOver;
       final isWinner =
           widget.state.isGameOver && widget.state.winner?.id == player.id;
 
@@ -692,7 +755,8 @@ class _PlayingTableState extends State<PlayingTable>
         ? _animatingPlayerIndex!
         : state.currentTurnPlayerIndex;
     final isHumanTurnActive = !widget.isDealing && activePlayerId == 0;
-    final canHumanAct = !widget.isDealing &&
+    final canHumanAct = !widget.isPaused &&
+        !widget.isDealing &&
         !widget.isProcessingMove &&
         !_isAnimatingExchange &&
         state.isHumanTurn;
@@ -1086,9 +1150,9 @@ class _SettingsGearIconPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// Paints a clean vector Trophy / Leaderboard icon matching the #2A2160 stroke style of the table buttons.
-class _StatsTrophyIconPainter extends CustomPainter {
-  const _StatsTrophyIconPainter();
+/// Paints a crisp History Clock-Arrow icon matching the #2A2160 stroke style of the table buttons.
+class _HistoryClockIconPainter extends CustomPainter {
+  const _HistoryClockIconPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1096,37 +1160,27 @@ class _StatsTrophyIconPainter extends CustomPainter {
     final paint = Paint()
       ..color = const Color(0xFF2A2160)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2 * s
+      ..strokeWidth = 2.3 * s
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    // Trophy cup body
-    final cup = Path()
-      ..moveTo(7 * s, 4 * s)
-      ..lineTo(17 * s, 4 * s)
-      ..lineTo(17 * s, 9.5 * s)
-      ..quadraticBezierTo(17 * s, 14.5 * s, 12 * s, 14.5 * s)
-      ..quadraticBezierTo(7 * s, 14.5 * s, 7 * s, 9.5 * s)
-      ..close();
-    canvas.drawPath(cup, paint);
+    // Circular history arc
+    final rect = Rect.fromCircle(center: Offset(12 * s, 12 * s), radius: 8.5 * s);
+    canvas.drawArc(rect, -2.35, 5.2, false, paint);
 
-    // Left & right handles
-    final handles = Path()
-      ..moveTo(7 * s, 6 * s)
-      ..lineTo(4.2 * s, 6 * s)
-      ..quadraticBezierTo(4.2 * s, 10.5 * s, 7 * s, 10.5 * s)
-      ..moveTo(17 * s, 6 * s)
-      ..lineTo(19.8 * s, 6 * s)
-      ..quadraticBezierTo(19.8 * s, 10.5 * s, 17 * s, 10.5 * s);
-    canvas.drawPath(handles, paint);
+    // Counter-clockwise arrow head at top-left
+    final arrow = Path()
+      ..moveTo(3.2 * s, 3.5 * s)
+      ..lineTo(3.2 * s, 8.2 * s)
+      ..lineTo(7.9 * s, 8.2 * s);
+    canvas.drawPath(arrow, paint);
 
-    // Stem & pedestal base
-    final base = Path()
-      ..moveTo(12 * s, 14.5 * s)
-      ..lineTo(12 * s, 19.5 * s)
-      ..moveTo(8 * s, 19.5 * s)
-      ..lineTo(16 * s, 19.5 * s);
-    canvas.drawPath(base, paint);
+    // Clock hands
+    final hands = Path()
+      ..moveTo(12 * s, 7.5 * s)
+      ..lineTo(12 * s, 12 * s)
+      ..lineTo(15 * s, 14 * s);
+    canvas.drawPath(hands, paint);
   }
 
   @override

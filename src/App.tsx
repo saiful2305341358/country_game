@@ -7,7 +7,7 @@ import { PlayerSelectionScreen } from './screens/PlayerSelectionScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { loadPersistedSettings, savePersistedSettings } from './services/soundSynthesizer';
 
-type ScreenRoute = 'intro' | 'menu' | 'playerSelection' | 'settings' | 'game';
+export type ScreenRoute = 'intro' | 'menu' | 'playerSelection' | 'settings' | 'game';
 
 const SESSION_INTRO_KEY = 'ccg_intro_played_session';
 let hasPlayedIntroInMemory = false;
@@ -80,10 +80,23 @@ export const LandscapeViewportWrapper: React.FC<{ children: React.ReactNode }> =
   );
 };
 
+interface NavigationState {
+  stack: ScreenRoute[];
+  previousByRoute: Partial<Record<ScreenRoute, ScreenRoute>>;
+}
+
 export function App() {
-  const [route, setRoute] = useState<ScreenRoute>(() =>
-    hasPlayedIntroThisSession() ? 'menu' : 'intro'
-  );
+  const [navState, setNavState] = useState<NavigationState>(() => ({
+    stack: hasPlayedIntroThisSession() ? ['menu'] : ['intro'],
+    previousByRoute: {
+      playerSelection: 'menu',
+      settings: 'menu',
+      game: 'playerSelection',
+    },
+  }));
+
+  const route = navState.stack[navState.stack.length - 1];
+
   const [settings, setSettings] = useState<GameSettings>(() => loadPersistedSettings());
   const [activeMatchConfig, setActiveMatchConfig] = useState<{
     totalPlayers: number;
@@ -95,15 +108,124 @@ export function App() {
     savePersistedSettings(nextSettings);
   }, []);
 
-  const navigateTo = useCallback((nextRoute: ScreenRoute) => {
+  const navigateTo = useCallback((nextRoute: ScreenRoute, fromRoute?: ScreenRoute) => {
     if (nextRoute !== 'intro') {
       markIntroPlayedThisSession();
     }
-    setRoute(nextRoute);
+
+    setNavState((prev) => {
+      const current = prev.stack[prev.stack.length - 1];
+      const sourceRoute = fromRoute ?? current;
+
+      const nextPreviousByRoute: Partial<Record<ScreenRoute, ScreenRoute>> =
+        sourceRoute && sourceRoute !== 'intro' && sourceRoute !== nextRoute
+          ? { ...prev.previousByRoute, [nextRoute]: sourceRoute }
+          : prev.previousByRoute;
+
+      if (current === nextRoute) {
+        return { stack: prev.stack, previousByRoute: nextPreviousByRoute };
+      }
+
+      // When transitioning out of the one-time intro or resetting to menu
+      if (current === 'intro' || nextRoute === 'menu') {
+        return { stack: [nextRoute], previousByRoute: nextPreviousByRoute };
+      }
+
+      // Preserve the source screen in the stack without creating duplicate entries
+      const baseStack: ScreenRoute[] = prev.stack.filter((r) => r !== 'intro');
+      let nextStack: ScreenRoute[];
+
+      if (
+        sourceRoute &&
+        sourceRoute !== 'intro' &&
+        baseStack[baseStack.length - 1] !== sourceRoute
+      ) {
+        const existingSourceIdx = baseStack.lastIndexOf(sourceRoute);
+        const trimmed =
+          existingSourceIdx >= 0
+            ? baseStack.slice(0, existingSourceIdx + 1)
+            : [...baseStack, sourceRoute];
+        nextStack = [...trimmed, nextRoute];
+      } else {
+        const existingTargetIdx = baseStack.lastIndexOf(nextRoute);
+        nextStack =
+          existingTargetIdx >= 0
+            ? baseStack.slice(0, existingTargetIdx + 1)
+            : [...baseStack, nextRoute];
+      }
+
+      return {
+        stack: nextStack,
+        previousByRoute: nextPreviousByRoute,
+      };
+    });
+
     try {
-      window.history.pushState({ route: nextRoute }, '');
+      window.history.pushState({ route: nextRoute, fromRoute }, '');
     } catch {
       // ignore in sandboxed iframes
+    }
+  }, []);
+
+  const navigateBack = useCallback((fromRoute?: ScreenRoute) => {
+    setNavState((prev) => {
+      const current = fromRoute ?? prev.stack[prev.stack.length - 1];
+
+      // 1. Prefer the explicit previous screen recorded for the active route
+      const recordedTarget = current ? prev.previousByRoute[current] : undefined;
+      if (recordedTarget && recordedTarget !== 'intro') {
+        const nextStack: ScreenRoute[] =
+          recordedTarget === 'playerSelection'
+            ? ['menu', 'playerSelection']
+            : recordedTarget === 'menu'
+              ? ['menu']
+              : ['menu', recordedTarget];
+        try {
+          window.history.replaceState({ route: recordedTarget }, '');
+        } catch {
+          // ignore
+        }
+        return { ...prev, stack: nextStack };
+      }
+
+      // 2. Otherwise pop the navigation stack
+      if (prev.stack.length > 1) {
+        const nextStack = prev.stack.slice(0, -1).filter((r) => r !== 'intro');
+        if (nextStack.length > 0) {
+          const targetRoute = nextStack[nextStack.length - 1];
+          try {
+            window.history.replaceState({ route: targetRoute }, '');
+          } catch {
+            // ignore
+          }
+          return { ...prev, stack: nextStack };
+        }
+      }
+
+      // 3. Safe fallback: GameScreen returns to PlayerSelectionScreen; others return to MainMenuScreen
+      const fallbackTarget: ScreenRoute = current === 'game' ? 'playerSelection' : 'menu';
+      const nextStack: ScreenRoute[] =
+        fallbackTarget === 'playerSelection' ? ['menu', 'playerSelection'] : ['menu'];
+
+      try {
+        window.history.replaceState({ route: fallbackTarget }, '');
+      } catch {
+        // ignore
+      }
+      return { ...prev, stack: nextStack };
+    });
+  }, []);
+
+  const navigateToMainMenu = useCallback(() => {
+    markIntroPlayedThisSession();
+    setNavState((prev) => ({
+      ...prev,
+      stack: ['menu'],
+    }));
+    try {
+      window.history.replaceState({ route: 'menu' }, '');
+    } catch {
+      // ignore
     }
   }, []);
 
@@ -117,20 +239,20 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Intercept Android system Back / browser history Back so it follows in-game hierarchy
+  // Intercept Android system Back / browser history Back so it follows the navigation stack
   useEffect(() => {
     const onPopState = () => {
       if (route === 'game') {
         // Re-push history state and notify GameScreen to open ExitConfirmationDialog
         try {
-          window.history.pushState({ route: 'game' }, '');
+          window.history.pushState({ route: 'game', fromRoute: 'playerSelection' }, '');
         } catch {
           // ignore
         }
         window.dispatchEvent(new CustomEvent('ccg-hardware-back'));
-      } else if (route === 'playerSelection' || route === 'settings') {
-        setRoute('menu');
-      } else if (route === 'menu' || route === 'intro') {
+      } else if (route !== 'menu' && route !== 'intro') {
+        navigateBack(route);
+      } else {
         try {
           window.history.pushState({ route }, '');
         } catch {
@@ -141,7 +263,7 @@ export function App() {
 
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, [route]);
+  }, [route, navigateBack]);
 
   return (
     <LandscapeViewportWrapper>
@@ -149,25 +271,27 @@ export function App() {
         <IntroVideoScreen
           onFinished={() => {
             markIntroPlayedThisSession();
-            navigateTo('menu');
+            navigateTo('menu', 'intro');
           }}
         />
       )}
 
       {route === 'menu' && (
         <MainMenuScreen
-          onPlayGame={() => navigateTo('playerSelection')}
-          onOpenSettings={() => navigateTo('settings')}
+          onPlayGame={() => navigateTo('playerSelection', 'menu')}
+          onOpenSettings={() => navigateTo('settings', 'menu')}
         />
       )}
 
       {route === 'playerSelection' && (
         <PlayerSelectionScreen
-          onBack={() => navigateTo('menu')}
+          initialPlayers={activeMatchConfig.totalPlayers}
+          initialActiveTypes={activeMatchConfig.predefinedTypes}
+          onBack={() => navigateBack('playerSelection')}
           onStartGame={(totalPlayers, activeTypes) => {
             setActiveMatchConfig({ totalPlayers, predefinedTypes: activeTypes });
             handleUpdateSettings({ ...settings, totalPlayers });
-            navigateTo('game');
+            navigateTo('game', 'playerSelection');
           }}
         />
       )}
@@ -176,7 +300,7 @@ export function App() {
         <SettingsScreen
           settings={settings}
           onUpdateSettings={handleUpdateSettings}
-          onBack={() => navigateTo('menu')}
+          onBack={() => navigateBack('settings')}
         />
       )}
 
@@ -186,7 +310,8 @@ export function App() {
           predefinedTypes={activeMatchConfig.predefinedTypes}
           settings={settings}
           onUpdateSettings={handleUpdateSettings}
-          onExitToMainMenu={() => navigateTo('menu')}
+          onNavigateBack={() => navigateBack('game')}
+          onExitToMainMenu={navigateToMainMenu}
         />
       )}
     </LandscapeViewportWrapper>
