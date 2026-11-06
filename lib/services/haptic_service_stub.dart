@@ -51,63 +51,40 @@ class HapticServiceMobile implements HapticServiceInterface {
 
   @override
   void cardTap() {
-    if (!_hapticsEnabled) return;
-    _nativeVibrate(pattern: const [16], amplitude: 140, style: 'light');
-    HapticFeedback.lightImpact();
+    // No haptic vibration during card moves in play time
   }
 
   @override
   void cardPass() {
-    if (!_hapticsEnabled) return;
-    _nativeVibrate(pattern: const [24], amplitude: 185, style: 'medium');
-    HapticFeedback.mediumImpact();
+    // No haptic vibration during card moves in play time
   }
 
   @override
   void invalidMove() {
-    if (!_hapticsEnabled) return;
-    _nativeVibrate(
-      pattern: const [22, 45, 32],
-      amplitude: 230,
-      style: 'error',
-    );
-    HapticFeedback.heavyImpact();
+    // No haptic vibration during card moves in play time
   }
 
   @override
   void botTurnTick() {
-    if (!_hapticsEnabled) return;
-    _nativeVibrate(pattern: const [10], amplitude: 110, style: 'selection');
-    HapticFeedback.selectionClick();
+    // No haptic vibration during card moves in play time
   }
 
   @override
   void yourTurnNotice() {
-    if (!_hapticsEnabled) return;
-    _nativeVibrate(
-      pattern: const [16, 35, 24],
-      amplitude: 195,
-      style: 'medium',
-    );
-    HapticFeedback.mediumImpact();
+    // No haptic vibration during play time
   }
 
   @override
   void dealShuffle() {
-    if (!_hapticsEnabled) return;
-    _nativeVibrate(
-      pattern: const [12, 30, 14, 30, 18],
-      amplitude: 160,
-      style: 'light',
-    );
-    HapticFeedback.selectionClick();
+    // No haptic vibration during card dealing
   }
 
   @override
   void victory() {
     if (!_hapticsEnabled) return;
+    // Real player win: strong celebratory 3-pulse vibration pattern
     _nativeVibrate(
-      pattern: const [40, 50, 50, 50, 90],
+      pattern: const [75, 50, 95, 50, 150],
       amplitude: 255,
       style: 'success',
     );
@@ -117,18 +94,17 @@ class HapticServiceMobile implements HapticServiceInterface {
   @override
   void roundEnd() {
     if (!_hapticsEnabled) return;
+    // Bot win: noticeably lighter, brief single pulse
     _nativeVibrate(
-      pattern: const [28, 60, 42],
-      amplitude: 200,
-      style: 'warning',
+      pattern: const [32],
+      amplitude: 110,
+      style: 'light',
     );
-    HapticFeedback.mediumImpact();
+    HapticFeedback.lightImpact();
   }
 
   @override
   void uiTap() {
-    if (!_hapticsEnabled) return;
-    _nativeVibrate(pattern: const [12], amplitude: 130, style: 'selection');
-    HapticFeedback.selectionClick();
+    // No haptic vibration on routine UI/card taps during play
   }
 }

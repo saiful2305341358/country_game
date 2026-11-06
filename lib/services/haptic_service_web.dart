@@ -41,64 +41,50 @@ class HapticServiceWeb implements HapticServiceInterface {
 
   @override
   void cardTap() {
-    if (!_hapticsEnabled) return;
-    HapticFeedback.lightImpact();
-    _vibratePattern(12);
+    // No haptic vibration during card moves in play time
   }
 
   @override
   void cardPass() {
-    if (!_hapticsEnabled) return;
-    HapticFeedback.mediumImpact();
-    _vibratePattern(22);
+    // No haptic vibration during card moves in play time
   }
 
   @override
   void invalidMove() {
-    if (!_hapticsEnabled) return;
-    HapticFeedback.heavyImpact();
-    _vibratePattern([18, 45, 24]);
+    // No haptic vibration during card moves in play time
   }
 
   @override
   void botTurnTick() {
-    if (!_hapticsEnabled) return;
-    HapticFeedback.selectionClick();
-    _vibratePattern(8);
+    // No haptic vibration during card moves in play time
   }
 
   @override
   void yourTurnNotice() {
-    if (!_hapticsEnabled) return;
-    HapticFeedback.mediumImpact();
-    _vibratePattern([14, 35, 22]);
+    // No haptic vibration during play time
   }
 
   @override
   void dealShuffle() {
-    if (!_hapticsEnabled) return;
-    HapticFeedback.selectionClick();
-    _vibratePattern([10, 30, 12, 30, 16]);
+    // No haptic vibration during card dealing
   }
 
   @override
   void victory() {
     if (!_hapticsEnabled) return;
     HapticFeedback.heavyImpact();
-    _vibratePattern([35, 50, 45, 50, 85]);
+    _vibratePattern([75, 50, 95, 50, 150]);
   }
 
   @override
   void roundEnd() {
     if (!_hapticsEnabled) return;
-    HapticFeedback.mediumImpact();
-    _vibratePattern([25, 60, 40]);
+    HapticFeedback.lightImpact();
+    _vibratePattern(32);
   }
 
   @override
   void uiTap() {
-    if (!_hapticsEnabled) return;
-    HapticFeedback.selectionClick();
-    _vibratePattern(10);
+    // No haptic vibration on routine UI/card taps during play
   }
 }

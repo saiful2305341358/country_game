@@ -74,9 +74,6 @@ class _GameScreenState extends State<GameScreen>
     )..addStatusListener((status) {
         if (status == AnimationStatus.completed && mounted) {
           setState(() => _isDealing = false);
-          if (_engine.state?.isHumanTurn == true) {
-            HapticService.instance.yourTurnNotice();
-          }
           if (!_showHistoryOverlay &&
               !_showStatsOverlay &&
               !_tutorialPausedEngine) {
@@ -123,17 +120,12 @@ class _GameScreenState extends State<GameScreen>
         _dealingController.value = 0.0;
       } else {
         AudioService.instance.playExchange();
-        HapticService.instance.dealShuffle();
         _dealingController.forward(from: 0.0);
       }
     } else {
       setState(() => _isDealing = false);
       if (!_showTutorialOverlay) {
         AudioService.instance.playGameStart();
-        HapticService.instance.dealShuffle();
-        if (_engine.state?.isHumanTurn == true) {
-          HapticService.instance.yourTurnNotice();
-        }
       }
     }
   }
@@ -263,14 +255,6 @@ class _GameScreenState extends State<GameScreen>
       }
       return;
     }
-
-    if (wasBotMove) {
-      if (state.isHumanTurn) {
-        HapticService.instance.yourTurnNotice();
-      } else {
-        HapticService.instance.botTurnTick();
-      }
-    }
   }
 
   void _onCardSelected(GameCard card) {
@@ -281,12 +265,7 @@ class _GameScreenState extends State<GameScreen>
         _engine.isProcessingMove) {
       return;
     }
-    final success = _engine.makeMove(card);
-    if (success) {
-      HapticService.instance.cardPass();
-    } else {
-      HapticService.instance.invalidMove();
-    }
+    _engine.makeMove(card);
   }
 
   void _openHistoryOverlay() {
@@ -356,12 +335,14 @@ class _GameScreenState extends State<GameScreen>
     setState(() {
       _showTutorialOverlay = false;
       _tutorialPausedEngine = false;
+      // If dealing had not started yet while the initial tutorial was open,
+      // mark dealing complete immediately so gameplay starts with zero delay
+      if (_isDealing && _dealingController.value <= 0.0) {
+        _isDealing = false;
+        _dealingController.value = 1.0;
+      }
     });
     if (_isDealing && _dealingController.value < 1.0) {
-      if (_dealingController.value == 0.0) {
-        AudioService.instance.playExchange();
-        HapticService.instance.dealShuffle();
-      }
       _dealingController.forward();
       return;
     }
@@ -370,7 +351,7 @@ class _GameScreenState extends State<GameScreen>
         !_showHistoryOverlay &&
         !_showStatsOverlay &&
         _engine.state?.isGameOver != true) {
-      _engine.resumeActivePlay();
+      _engine.resumeActivePlay(immediate: true);
     }
   }
 

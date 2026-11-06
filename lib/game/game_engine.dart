@@ -17,6 +17,10 @@ class GameEngine extends ChangeNotifier {
   GameState? _state;
   GameSettings _settings;
   Timer? _botTimer;
+  DateTime? _botTimerStartedAt;
+  int _botRemainingDelayMs = 0;
+  int _botScheduledTurnCount = -1;
+  GameCard? _pendingBotDiscard;
   int _gameSessionId = 0;
   bool _isProcessingMove = false;
   bool _isExchangeAnimating = false;
@@ -49,7 +53,7 @@ class GameEngine extends ChangeNotifier {
     List<CountryType>? predefinedTypes,
     bool deferBotStart = false,
   }) {
-    _cancelBotAction();
+    _cancelBotAction(clearRemaining: true);
     _gameSessionId++;
     final currentSession = _gameSessionId;
     _isProcessingMove = false;
@@ -113,11 +117,12 @@ class GameEngine extends ChangeNotifier {
   }
 
   /// Called after initial dealing animation finishes or when unpausing the game.
-  void resumeActivePlay() {
+  void resumeActivePlay({bool immediate = false}) {
     if (_state == null) return;
     _isPaused = false;
+    notifyListeners();
     if (!_isExchangeAnimating) {
-      _triggerBotIfNeeded(_gameSessionId);
+      _triggerBotIfNeeded(_gameSessionId, immediate: immediate);
     }
   }
 
@@ -131,16 +136,33 @@ class GameEngine extends ChangeNotifier {
     }
   }
 
-  /// Pauses scheduled bot actions while pause dialog is open.
+  /// Pauses scheduled bot actions while tutorial or pause dialog is open,
+  /// preserving remaining timer progress so resumption has zero extra delay.
   void pauseActivePlay() {
+    if (!_isPaused &&
+        _botTimer != null &&
+        _botTimerStartedAt != null &&
+        _state != null &&
+        _botScheduledTurnCount == _state!.turnCount) {
+      final elapsed =
+          DateTime.now().difference(_botTimerStartedAt!).inMilliseconds;
+      _botRemainingDelayMs = max(0, _botRemainingDelayMs - elapsed);
+    }
     _isPaused = true;
-    _cancelBotAction();
+    _cancelBotAction(clearRemaining: false);
+    notifyListeners();
   }
 
   /// Cancels any scheduled bot moves.
-  void _cancelBotAction() {
+  void _cancelBotAction({bool clearRemaining = true}) {
     _botTimer?.cancel();
     _botTimer = null;
+    _botTimerStartedAt = null;
+    if (clearRemaining) {
+      _botRemainingDelayMs = 0;
+      _botScheduledTurnCount = -1;
+      _pendingBotDiscard = null;
+    }
   }
 
   /// Attempts to make a move for the active player.
@@ -283,7 +305,7 @@ class GameEngine extends ChangeNotifier {
     return true;
   }
 
-  void _triggerBotIfNeeded(int sessionId) {
+  void _triggerBotIfNeeded(int sessionId, {bool immediate = false}) {
     if (_state == null ||
         _state!.isGameOver ||
         _isPaused ||
@@ -292,37 +314,53 @@ class GameEngine extends ChangeNotifier {
     }
     if (_state!.isHumanTurn) return;
 
-    _cancelBotAction();
+    final hasSavedTurnState = _botScheduledTurnCount == _state!.turnCount &&
+        _pendingBotDiscard != null;
+    final savedRemainingMs = _botRemainingDelayMs;
+    final savedDiscard = _pendingBotDiscard;
+
+    _cancelBotAction(clearRemaining: !hasSavedTurnState);
 
     BotDecision? precomputedDecision;
-    try {
-      precomputedDecision = BotStrategy.evaluateDecision(
-        state: _state!,
-        baseDelayMs: _settings.botDelayMs,
-      );
-    } catch (_) {}
+    if (!hasSavedTurnState) {
+      try {
+        precomputedDecision = BotStrategy.evaluateDecision(
+          state: _state!,
+          baseDelayMs: _settings.botDelayMs,
+        );
+      } catch (_) {}
+    }
 
     final int computedThinkMs = precomputedDecision?.thinkDelayMs ??
         (_settings.botDelayMs * 0.48).round().clamp(480, 1100);
 
-    final delay = _settings.animationsEnabled
-        ? Duration(
-            milliseconds: waitForExchangeAnimation
-                ? computedThinkMs
-                : _settings.botDelayMs,
-          )
-        : const Duration(milliseconds: 100);
+    final int baseDelayMs = hasSavedTurnState
+        ? savedRemainingMs
+        : (_settings.animationsEnabled
+            ? (waitForExchangeAnimation ? computedThinkMs : _settings.botDelayMs)
+            : 100);
 
-    _botTimer = Timer(delay, () {
+    final int effectiveDelayMs =
+        immediate ? min(baseDelayMs, 40) : max(16, baseDelayMs);
+
+    _botScheduledTurnCount = _state!.turnCount;
+    _botRemainingDelayMs = effectiveDelayMs;
+    _pendingBotDiscard = savedDiscard ?? precomputedDecision?.discardCard;
+    _botTimerStartedAt = DateTime.now();
+
+    _botTimer = Timer(Duration(milliseconds: effectiveDelayMs), () {
       if (_gameSessionId != sessionId || _isPaused || _isExchangeAnimating) {
         return;
       }
       if (_state == null || _state!.isGameOver) return;
       if (_state!.isHumanTurn) return;
 
+      final discardToPlay = _pendingBotDiscard;
+      _cancelBotAction(clearRemaining: true);
+
       try {
-        final botDiscard = precomputedDecision?.discardCard ??
-            BotStrategy.chooseDiscard(state: _state!);
+        final botDiscard =
+            discardToPlay ?? BotStrategy.chooseDiscard(state: _state!);
         makeMove(botDiscard);
       } catch (e) {
         debugPrint('Error in bot move: $e');

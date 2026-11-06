@@ -154,12 +154,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [stageScale, setStageScale] = useState(0.5);
-
   const [state, setState] = useState<GameState>(() =>
     createInitialGameState(totalPlayers, predefinedTypes)
   );
-  const [isDealing, setIsDealing] = useState<boolean>(settings.animationsEnabled);
-  const [dealingProgress, setDealingProgress] = useState<number>(0);
 
   const [isAnimatingExchange, setIsAnimatingExchange] = useState(false);
   const [exchangeProgress, setExchangeProgress] = useState(0);
@@ -170,13 +167,20 @@ export const GameScreen: React.FC<GameScreenProps> = ({
   const [lockedPlayerCardPos, setLockedPlayerCardPos] = useState({ x: 0, y: 0 });
   const [lockedOldTableSlotPos, setLockedOldTableSlotPos] = useState(LEFT_TABLE_SLOT);
   const [lockedIncomingTableSlotPos, setLockedIncomingTableSlotPos] = useState(RIGHT_TABLE_SLOT);
-
   const [showExitConfirmDialog, setShowExitConfirmDialog] = useState(false);
   const [showPauseDialog, setShowPauseDialog] = useState(false);
   const [showHistoryOverlay, setShowHistoryOverlay] = useState(false);
   const [showStatsOverlay, setShowStatsOverlay] = useState(false);
   const [showTutorialOverlay, setShowTutorialOverlay] = useState<boolean>(
     () => !StatsService.hasSeenTutorial()
+  );
+  // If the first-time tutorial is open on mount, have cards already dealt on the table
+  // so that closing the tutorial resumes gameplay with zero dealing delay
+  const [isDealing, setIsDealing] = useState<boolean>(
+    () => settings.animationsEnabled && StatsService.hasSeenTutorial()
+  );
+  const [dealingProgress, setDealingProgress] = useState<number>(() =>
+    StatsService.hasSeenTutorial() ? 0 : 1
   );
   const [isDocumentHidden, setIsDocumentHidden] = useState<boolean>(
     () => typeof document !== 'undefined' && document.hidden
@@ -188,11 +192,24 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
   const recordedWinRef = useRef(false);
   const isProcessingMoveRef = useRef(false);
-  const dealingProgressRef = useRef(0);
+  const dealingProgressRef = useRef(StatsService.hasSeenTutorial() ? 0 : 1);
   const playedDealSoundRef = useRef(false);
   const exchangeProgressRef = useRef(0);
   const playedExchangeLandingRef = useRef(false);
   const playedExchangeOutgoingRef = useRef(false);
+  const isGamePausedRef = useRef(false);
+  const immediateResumeFromTutorialRef = useRef(false);
+  const botTurnTimerStateRef = useRef<{
+    turnCount: number;
+    remainingMs: number;
+    startedAt: number;
+    chosenCard: GameCard | null;
+  }>({
+    turnCount: -1,
+    remainingMs: 0,
+    startedAt: 0,
+    chosenCard: null,
+  });
 
   const isGamePaused =
     isDocumentHidden ||
@@ -201,6 +218,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     showExitConfirmDialog ||
     showHistoryOverlay ||
     showStatsOverlay;
+
+  isGamePausedRef.current = isGamePaused;
 
   // Measure viewport to scale 1920x1080 stage cleanly on all mobile orientations
   useEffect(() => {
@@ -241,6 +260,13 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         setShowStatsOverlay(false);
       } else if (showTutorialOverlay) {
         StatsService.markTutorialSeen();
+        immediateResumeFromTutorialRef.current = true;
+        isGamePausedRef.current = false;
+        if (isDealing && dealingProgressRef.current <= 0) {
+          dealingProgressRef.current = 1;
+          setDealingProgress(1);
+          setIsDealing(false);
+        }
         setShowTutorialOverlay(false);
       } else if (showPauseDialog) {
         setShowPauseDialog(false);
@@ -270,7 +296,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     if (!settings.animationsEnabled && !showTutorialOverlay) {
       playedDealSoundRef.current = true;
       AudioService.playGameStart();
-      HapticService.dealShuffle();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -282,7 +307,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
       if (!playedDealSoundRef.current) {
         playedDealSoundRef.current = true;
         AudioService.playGameStart();
-        HapticService.dealShuffle();
       }
       return;
     }
@@ -290,7 +314,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     if (!playedDealSoundRef.current) {
       playedDealSoundRef.current = true;
       AudioService.playExchange();
-      HapticService.dealShuffle();
     }
 
     let animId = 0;
@@ -326,7 +349,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
       if (!playedExchangeLandingRef.current && p >= 0.44) {
         playedExchangeLandingRef.current = true;
         AudioService.playCardPlace();
-        HapticService.botTurnTick();
       }
       if (!playedExchangeOutgoingRef.current && p >= 0.56) {
         playedExchangeOutgoingRef.current = true;
@@ -377,12 +399,16 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
   const performMove = useCallback(
     (card: GameCard) => {
-      if (isProcessingMoveRef.current || isDealing || isAnimatingExchange || isGamePaused) {
+      if (
+        isProcessingMoveRef.current ||
+        isDealing ||
+        isAnimatingExchange ||
+        isGamePausedRef.current
+      ) {
         return false;
       }
       const { nextState, isValid } = executeGameMove(state, card);
       if (!isValid) {
-        HapticService.invalidMove();
         setState(nextState);
         return false;
       }
@@ -435,7 +461,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     [isDealing, isAnimatingExchange, isGamePaused, settings.animationsEnabled, state]
   );
 
-  // Bot turn scheduler
+  // Bot turn scheduler (tracks elapsed/remaining time across tutorial/modal pauses and resumes immediately)
   useEffect(() => {
     if (
       isDealing ||
@@ -447,23 +473,50 @@ export const GameScreen: React.FC<GameScreenProps> = ({
       return;
     }
 
+    const timerState = botTurnTimerStateRef.current;
     let delayMs = 650;
     let chosenCard: GameCard | null = null;
-    try {
-      const decision = evaluateBotDecision(state, settings.botDelayMs);
-      chosenCard = decision.discardCard;
-      delayMs = settings.animationsEnabled ? decision.thinkDelayMs : 120;
-    } catch {
-      // fallback
+
+    if (timerState.turnCount === state.turnCount && timerState.chosenCard) {
+      // Resuming a bot turn that was paused while the tutorial or another overlay was open
+      chosenCard = timerState.chosenCard;
+      delayMs = immediateResumeFromTutorialRef.current
+        ? Math.min(timerState.remainingMs, 40)
+        : Math.max(16, timerState.remainingMs);
+    } else {
+      try {
+        const decision = evaluateBotDecision(state, settings.botDelayMs);
+        chosenCard = decision.discardCard;
+        delayMs = settings.animationsEnabled ? decision.thinkDelayMs : 120;
+        if (immediateResumeFromTutorialRef.current) {
+          delayMs = Math.min(delayMs, 60);
+        }
+      } catch {
+        // fallback
+      }
+      timerState.turnCount = state.turnCount;
+      timerState.chosenCard = chosenCard;
+      timerState.remainingMs = delayMs;
     }
 
+    immediateResumeFromTutorialRef.current = false;
+    timerState.startedAt = performance.now();
+
     const timer = window.setTimeout(() => {
+      timerState.turnCount = -1;
+      timerState.remainingMs = 0;
       if (chosenCard) {
         performMove(chosenCard);
       }
     }, delayMs);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (timerState.turnCount === state.turnCount && timerState.startedAt > 0) {
+        const elapsed = performance.now() - timerState.startedAt;
+        timerState.remainingMs = Math.max(0, timerState.remainingMs - elapsed);
+      }
+    };
   }, [
     isDealing,
     isAnimatingExchange,
@@ -473,6 +526,18 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     settings.animationsEnabled,
     performMove,
   ]);
+
+  const handleCloseTutorialOverlay = useCallback(() => {
+    StatsService.markTutorialSeen();
+    immediateResumeFromTutorialRef.current = true;
+    isGamePausedRef.current = false;
+    if (isDealing && dealingProgressRef.current <= 0) {
+      dealingProgressRef.current = 1;
+      setDealingProgress(1);
+      setIsDealing(false);
+    }
+    setShowTutorialOverlay(false);
+  }, [isDealing]);
 
   const handleRestartMatch = () => {
     recordedWinRef.current = false;
@@ -574,88 +639,143 @@ export const GameScreen: React.FC<GameScreenProps> = ({
       >
         {/* Top-Left Back Button (opens dedicated Exit Confirmation Dialog) */}
         <button
+          type="button"
           onClick={() => {
             AudioService.playButtonClick();
             HapticService.uiTap();
             setShowPauseDialog(false);
             setShowExitConfirmDialog(true);
           }}
-          style={{ left: '90px', top: '60px', width: '68px', height: '68px' }}
-          className="absolute rounded-full bg-white border-2 border-[#DAD3F5] flex items-center justify-center hover:scale-105 transition cursor-pointer shadow"
+          style={{
+            left: '66px',
+            top: '44px',
+            width: '92px',
+            height: '92px',
+            boxShadow: '0 6px 0 #1E1745, 0 12px 22px rgba(15, 23, 42, 0.28)',
+            touchAction: 'manipulation',
+          }}
+          className="group absolute rounded-full bg-gradient-to-b from-white to-[#F4F1FF] border-[3.5px] border-[#2A2160] flex items-center justify-center hover:scale-105 active:scale-95 active:translate-y-0.5 transition-transform cursor-pointer"
           title="Leave Game"
           aria-label="Leave Game"
         >
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M15 5l-7 7 7 7"
-              stroke="#2A2160"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          {/* Expanded 108x108 invisible mobile touch target */}
+          <span className="absolute -inset-2 rounded-full" aria-hidden="true" />
+          <span className="w-[74px] h-[74px] rounded-full bg-[#F3F0FF] border-[1.5px] border-[#DAD3F5] flex items-center justify-center group-hover:bg-[#EAE4FF] transition-colors">
+            <svg width="46" height="46" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M11 6L5 12L11 18"
+                stroke="#2A2160"
+                strokeWidth="3.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M6 12H19"
+                stroke="#2A2160"
+                strokeWidth="3.2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </span>
         </button>
 
         {/* Top-Left Quick Tutorial (?) Button */}
         <button
+          type="button"
           onClick={() => {
             AudioService.playButtonClick();
             HapticService.uiTap();
             setShowTutorialOverlay(true);
           }}
-          style={{ left: '176px', top: '60px', width: '68px', height: '68px' }}
-          className="absolute rounded-full bg-white border-2 border-[#DAD3F5] flex items-center justify-center hover:scale-105 transition cursor-pointer shadow"
+          style={{
+            left: '180px',
+            top: '44px',
+            width: '92px',
+            height: '92px',
+            boxShadow: '0 6px 0 #1E1745, 0 12px 22px rgba(15, 23, 42, 0.28)',
+            touchAction: 'manipulation',
+          }}
+          className="group absolute rounded-full bg-gradient-to-b from-white to-[#FFFBEB] border-[3.5px] border-[#2A2160] flex items-center justify-center hover:scale-105 active:scale-95 active:translate-y-0.5 transition-transform cursor-pointer"
           title="Quick Tutorial"
+          aria-label="Quick Tutorial"
         >
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M9.1 9C9.5 6.2 14.5 6.2 14.9 9.2C15.2 11.4 12 12 12 14.2"
-              stroke="#2A2160"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <circle cx="12" cy="18.2" r="1.45" fill="#2A2160" />
-          </svg>
+          {/* Expanded 108x108 invisible mobile touch target */}
+          <span className="absolute -inset-2 rounded-full" aria-hidden="true" />
+          <span className="w-[74px] h-[74px] rounded-full bg-[#FEF3C7] border-[1.5px] border-[#FDE68A] flex items-center justify-center group-hover:bg-[#FDE68A]/75 transition-colors">
+            <svg width="46" height="46" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M8.8 8.6C9.2 5.5 14.8 5.5 15.2 8.9C15.5 11.3 12 11.9 12 14.3"
+                stroke="#2A2160"
+                strokeWidth="3.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <circle cx="12" cy="18.5" r="1.9" fill="#D97706" />
+              <circle cx="12" cy="18.5" r="1.9" stroke="#2A2160" strokeWidth="1.2" />
+            </svg>
+          </span>
         </button>
 
         {/* Top-Right Recent Cards History Button (replaces Player Stats & Sets on play screen) */}
         <button
+          type="button"
           onClick={() => {
             AudioService.playButtonClick();
             HapticService.uiTap();
             setShowHistoryOverlay((prev) => !prev);
           }}
-          style={{ left: '1676px', top: '60px', width: '68px', height: '68px' }}
-          className="absolute rounded-full bg-white border-2 border-[#DAD3F5] flex items-center justify-center hover:scale-105 transition cursor-pointer shadow"
+          style={{
+            left: '1648px',
+            top: '44px',
+            width: '92px',
+            height: '92px',
+            boxShadow: '0 6px 0 #1E1745, 0 12px 22px rgba(15, 23, 42, 0.28)',
+            touchAction: 'manipulation',
+          }}
+          className="group absolute rounded-full bg-gradient-to-b from-white to-[#ECFDF5] border-[3.5px] border-[#2A2160] flex items-center justify-center hover:scale-105 active:scale-95 active:translate-y-0.5 transition-transform cursor-pointer"
           title="Last 5 Cards Played"
           aria-label="Last 5 Cards Played"
         >
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M3 12a9 9 0 1 0 3-6.7L3 8"
-              stroke="#2A2160"
-              strokeWidth="2.3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M3 3v5h5"
-              stroke="#2A2160"
-              strokeWidth="2.3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M12 7.5V12l3 2"
-              stroke="#2A2160"
-              strokeWidth="2.3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          {/* Expanded 108x108 invisible mobile touch target */}
+          <span className="absolute -inset-2 rounded-full" aria-hidden="true" />
+          <span className="w-[74px] h-[74px] rounded-full bg-[#ECFDF5] border-[1.5px] border-[#A7F3D0] flex items-center justify-center group-hover:bg-[#D1FAE5] transition-colors">
+            <svg width="46" height="46" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M3.2 12a8.8 8.8 0 1 0 2.7-6.4L3.2 8.2"
+                stroke="#2A2160"
+                strokeWidth="3.0"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M3.2 3.4v4.8H8"
+                stroke="#2A2160"
+                strokeWidth="3.0"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <rect
+                x="9.2"
+                y="7.2"
+                width="6.4"
+                height="9.2"
+                rx="1.5"
+                fill="#D97706"
+                fillOpacity="0.18"
+                stroke="#2A2160"
+                strokeWidth="2.4"
+              />
+              <path
+                d="M12.4 9.6v2.6l1.8 1.2"
+                stroke="#2A2160"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
           {state.recentPlayedCards.length > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] px-1 rounded-full bg-[#D97706] border-2 border-white text-white text-[11px] font-black flex items-center justify-center tabular-nums shadow">
+            <span className="absolute -top-1.5 -right-1.5 min-w-[32px] h-[32px] px-1.5 rounded-full bg-[#D97706] border-[3px] border-white text-white text-[15px] font-black flex items-center justify-center tabular-nums shadow-md">
               {state.recentPlayedCards.length}
             </span>
           )}
@@ -663,26 +783,47 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
         {/* Top-Right Settings Button (opens GAME PAUSED panel) */}
         <button
+          type="button"
           onClick={() => {
             AudioService.playButtonClick();
             HapticService.uiTap();
             setShowExitConfirmDialog(false);
             setShowPauseDialog(true);
           }}
-          style={{ left: '1762px', top: '60px', width: '68px', height: '68px' }}
-          className="absolute rounded-full bg-white border-2 border-[#DAD3F5] flex items-center justify-center hover:scale-105 transition cursor-pointer shadow"
+          style={{
+            left: '1762px',
+            top: '44px',
+            width: '92px',
+            height: '92px',
+            boxShadow: '0 6px 0 #1E1745, 0 12px 22px rgba(15, 23, 42, 0.28)',
+            touchAction: 'manipulation',
+          }}
+          className="group absolute rounded-full bg-gradient-to-b from-white to-[#EEF2FF] border-[3.5px] border-[#2A2160] flex items-center justify-center hover:scale-105 active:scale-95 active:translate-y-0.5 transition-transform cursor-pointer"
           title="Settings & Controls"
           aria-label="Settings & Controls"
         >
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="3" stroke="#2A2160" strokeWidth="2.4" />
-            <path
-              d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1"
-              stroke="#2A2160"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-            />
-          </svg>
+          {/* Expanded 108x108 invisible mobile touch target */}
+          <span className="absolute -inset-2 rounded-full" aria-hidden="true" />
+          <span className="w-[74px] h-[74px] rounded-full bg-[#EEF2FF] border-[1.5px] border-[#C7D2FE] flex items-center justify-center group-hover:bg-[#E0E7FF] transition-colors">
+            <svg width="46" height="46" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7Z"
+                fill="#2A2160"
+                fillOpacity="0.16"
+                stroke="#2A2160"
+                strokeWidth="2.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
+                stroke="#2A2160"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
         </button>
 
         {/* Dealing Stack (shown during initial deal) */}
@@ -794,20 +935,12 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                   onTap={
                     legal
                       ? () => {
-                          HapticService.cardTap();
                           AudioService.playCardTap();
-                          const ok = performMove(card);
-                          if (ok) HapticService.cardPass();
+                          performMove(card);
                         }
                       : undefined
                   }
-                  onIllegalTap={
-                    canHumanAct && !legal
-                      ? () => {
-                          HapticService.invalidMove();
-                        }
-                      : undefined
-                  }
+                  onIllegalTap={undefined}
                 />
               </div>
             );
@@ -972,10 +1105,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({
       {showTutorialOverlay && (
         <TutorialModalOverlay
           targetSetSize={state.totalPlayers}
-          onClose={() => {
-            StatsService.markTutorialSeen();
-            setShowTutorialOverlay(false);
-          }}
+          onResumeGame={handleCloseTutorialOverlay}
+          onClose={handleCloseTutorialOverlay}
         />
       )}
     </div>

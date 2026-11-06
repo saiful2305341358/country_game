@@ -403,12 +403,20 @@ class MainActivity : FlutterActivity() {
                 }
             } else {
                 val timings = LongArray(patternList.size + 1)
+                val amplitudes = IntArray(patternList.size + 1)
                 timings[0] = 0L
+                amplitudes[0] = 0
                 for (i in patternList.indices) {
                     timings[i + 1] = patternList[i].toLong().coerceAtLeast(10L)
+                    // Even indices in patternList (0, 2, 4...) are active vibration pulses; odd indices are pauses
+                    amplitudes[i + 1] = if (i % 2 == 0) amplitude else 0
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    vib.vibrate(VibrationEffect.createWaveform(timings, -1))
+                    if (vib.hasAmplitudeControl()) {
+                        vib.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+                    } else {
+                        vib.vibrate(VibrationEffect.createWaveform(timings, -1))
+                    }
                 } else {
                     vib.vibrate(timings, -1)
                 }

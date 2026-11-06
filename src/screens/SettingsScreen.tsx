@@ -37,7 +37,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     HapticService.isHapticsEnabled = next;
     onUpdateSettings({ ...settings, hapticsEnabled: next });
     if (next) {
-      HapticService.cardPass();
+      HapticService.roundEnd();
     }
   };
 
@@ -83,17 +83,21 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         {/* Top Header */}
         <div className="flex items-center justify-between">
           <button
+            type="button"
             onClick={() => {
               AudioService.playButtonClick();
               HapticService.uiTap();
               onBack();
             }}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-[#FFD54F] hover:bg-white/10 cursor-pointer"
+            style={{ touchAction: 'manipulation' }}
+            className="w-11 h-11 rounded-full bg-black/40 border border-[#FFD54F]/45 flex items-center justify-center text-[#FFD54F] hover:bg-white/15 active:scale-95 transition cursor-pointer shadow"
+            aria-label="Back"
+            title="Back"
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={22} strokeWidth={2.6} />
           </button>
           <h1 className="text-[#FFD700] text-base sm:text-lg font-bold tracking-wider">Settings</h1>
-          <div className="w-9 h-9 sm:w-10 sm:h-10" />
+          <div className="w-11 h-11" />
         </div>
 
         {/* Two-Column Landscape Cards */}
@@ -138,7 +142,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 <div>
                   <div className="text-white text-xs font-semibold">Tactile Haptic Feedback</div>
                   <div className="text-white/60 text-[10px]">
-                    Physical vibration responses for card taps, turn alerts, and victory events
+                    Celebratory vibration when you win a match, and a softer pulse when a bot wins
                   </div>
                 </div>
               </div>

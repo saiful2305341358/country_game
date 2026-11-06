@@ -414,13 +414,30 @@ export const PlayerStatsOverlay: React.FC<{
 export const TutorialModalOverlay: React.FC<{
   targetSetSize: number;
   onClose: () => void;
-}> = ({ targetSetSize, onClose }) => {
-  const handleDismiss = () => {
+  onResumeGame?: () => void;
+}> = ({ targetSetSize, onClose, onResumeGame }) => {
+  const dismissedRef = useRef(false);
+
+  const handleDismiss = useCallback(() => {
+    if (dismissedRef.current) return;
+    dismissedRef.current = true;
     StatsService.markTutorialSeen();
     AudioService.playButtonClick();
-    HapticService.uiTap();
+    // Immediately resume the game's internal timer and event loops before/upon closing
+    onResumeGame?.();
     onClose();
-  };
+  }, [onClose, onResumeGame]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleDismiss();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleDismiss]);
 
   const steps = [
     {

@@ -1,9 +1,9 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/game_card.dart';
 import '../models/game_player.dart';
 import '../models/game_state.dart';
 import '../services/audio_service.dart';
-import '../services/haptic_service.dart';
 import 'card_back_view.dart';
 import 'country_card_view.dart';
 import 'player_seat.dart';
@@ -191,7 +191,6 @@ class _PlayingTableState extends State<PlayingTable>
     if (!_hasPlayedLandingCue && p >= _phase2End) {
       _hasPlayedLandingCue = true;
       AudioService.instance.playCardPlace();
-      HapticService.instance.botTurnTick();
     }
     if (!_hasPlayedOutgoingCue && p >= _phase4Start) {
       _hasPlayedOutgoingCue = true;
@@ -461,67 +460,73 @@ class _PlayingTableState extends State<PlayingTable>
                   children: [
                     // 1. Top-Left Back Button (opens dedicated Exit Confirmation Dialog)
                     Positioned(
-                      left: 90,
-                      top: 60,
-                      width: 68,
-                      height: 68,
+                      left: 66,
+                      top: 44,
+                      width: 92,
+                      height: 92,
                       child: _buildCircleButton(
                         tooltip: 'Leave Game',
                         onTap: widget.onBack ?? widget.onPause,
+                        innerFillColor: const Color(0xFFF3F0FF),
+                        innerBorderColor: const Color(0xFFDAD3F5),
                         child: const CustomPaint(
-                          size: Size(30, 30),
+                          size: Size(46, 46),
                           painter: _BackChevronIconPainter(),
                         ),
                       ),
                     ),
 
-                    // 1b. Top-Left Quick Tutorial (?) Button (.btn at left: 176px, top: 60px)
+                    // 1b. Top-Left Quick Tutorial (?) Button (.btn at left: 180px, top: 44px)
                     if (widget.onShowTutorial != null)
                       Positioned(
-                        left: 176,
-                        top: 60,
-                        width: 68,
-                        height: 68,
+                        left: 180,
+                        top: 44,
+                        width: 92,
+                        height: 92,
                         child: _buildCircleButton(
                           tooltip: 'Quick Tutorial',
                           onTap: widget.onShowTutorial!,
+                          innerFillColor: const Color(0xFFFEF3C7),
+                          innerBorderColor: const Color(0xFFFDE68A),
                           child: const CustomPaint(
-                            size: Size(30, 30),
+                            size: Size(46, 46),
                             painter: _TutorialHelpIconPainter(),
                           ),
                         ),
                       ),
 
-                    // 2. Top-Right Last 5 Cards Played History Button (.btn at left: 1676px, top: 60px)
+                    // 2. Top-Right Last 5 Cards Played History Button (.btn at left: 1648px, top: 44px)
                     if (widget.onShowHistory != null)
                       Positioned(
-                        left: 1676,
-                        top: 60,
-                        width: 68,
-                        height: 68,
+                        left: 1648,
+                        top: 44,
+                        width: 92,
+                        height: 92,
                         child: Stack(
                           clipBehavior: Clip.none,
                           children: [
                             _buildCircleButton(
                               tooltip: 'Last 5 Cards Played',
                               onTap: widget.onShowHistory!,
+                              innerFillColor: const Color(0xFFECFDF5),
+                              innerBorderColor: const Color(0xFFA7F3D0),
                               child: const CustomPaint(
-                                size: Size(30, 30),
+                                size: Size(46, 46),
                                 painter: _HistoryClockIconPainter(),
                               ),
                             ),
                             if (widget.state.recentPlayedCards.isNotEmpty)
                               Positioned(
-                                right: -2,
-                                top: -2,
+                                right: -4,
+                                top: -4,
                                 child: IgnorePointer(
                                   child: Container(
                                     constraints: const BoxConstraints(
-                                      minWidth: 22,
-                                      minHeight: 22,
+                                      minWidth: 32,
+                                      minHeight: 32,
                                     ),
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 5,
+                                      horizontal: 6,
                                     ),
                                     alignment: Alignment.center,
                                     decoration: BoxDecoration(
@@ -529,14 +534,23 @@ class _PlayingTableState extends State<PlayingTable>
                                       shape: BoxShape.circle,
                                       border: Border.all(
                                         color: Colors.white,
-                                        width: 2,
+                                        width: 3,
                                       ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(
+                                            alpha: 0.28,
+                                          ),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
                                     ),
                                     child: Text(
                                       '${widget.state.recentPlayedCards.length}',
                                       style: const TextStyle(
                                         color: Colors.white,
-                                        fontSize: 11,
+                                        fontSize: 15,
                                         fontWeight: FontWeight.w900,
                                       ),
                                     ),
@@ -547,17 +561,19 @@ class _PlayingTableState extends State<PlayingTable>
                         ),
                       ),
 
-                    // 3. Top-Right Settings Button (.btn at left: 1762px, top: 60px)
+                    // 3. Top-Right Settings Button (.btn at left: 1762px, top: 44px)
                     Positioned(
                       left: 1762,
-                      top: 60,
-                      width: 68,
-                      height: 68,
+                      top: 44,
+                      width: 92,
+                      height: 92,
                       child: _buildCircleButton(
                         tooltip: 'Settings & Controls',
                         onTap: widget.onPause,
+                        innerFillColor: const Color(0xFFEEF2FF),
+                        innerBorderColor: const Color(0xFFC7D2FE),
                         child: const CustomPaint(
-                          size: Size(30, 30),
+                          size: Size(46, 46),
                           painter: _SettingsGearIconPainter(),
                         ),
                       ),
@@ -640,23 +656,54 @@ class _PlayingTableState extends State<PlayingTable>
     required String tooltip,
     required VoidCallback onTap,
     required Widget child,
+    Color innerFillColor = const Color(0xFFF3F0FF),
+    Color innerBorderColor = const Color(0xFFDAD3F5),
   }) {
     return Tooltip(
       message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          customBorder: const CircleBorder(),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          width: 92,
+          height: 92,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFFFFFFFF),
+                Color(0xFFF4F1FF),
+              ],
+            ),
+            border: Border.all(
+              color: const Color(0xFF2A2160),
+              width: 3.5,
+            ),
+            boxShadow: [
+              const BoxShadow(
+                color: Color(0xFF1E1745),
+                offset: Offset(0, 6),
+                blurRadius: 0,
+              ),
+              BoxShadow(
+                color: const Color(0xFF0F172A).withValues(alpha: 0.28),
+                offset: const Offset(0, 12),
+                blurRadius: 22,
+              ),
+            ],
+          ),
+          alignment: Alignment.center,
           child: Container(
-            width: 68,
-            height: 68,
+            width: 74,
+            height: 74,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFFFFFFFF),
+              color: innerFillColor,
               border: Border.all(
-                color: const Color(0xFFDAD3F5),
-                width: 2,
+                color: innerBorderColor,
+                width: 1.5,
               ),
             ),
             alignment: Alignment.center,
@@ -686,7 +733,6 @@ class _PlayingTableState extends State<PlayingTable>
           final match =
               humanHand.where((c) => c.id == _selectedCardId).toList();
           if (match.isNotEmpty && state.isLegalDiscard(match.first)) {
-            HapticService.instance.cardTap();
             AudioService.instance.playCardTap();
             widget.onCardSelected(match.first);
           }
@@ -835,16 +881,11 @@ class _PlayingTableState extends State<PlayingTable>
                     isSelected: isSelected,
                     onTap: isLegal
                         ? () {
-                            HapticService.instance.cardTap();
                             AudioService.instance.playCardTap();
                             widget.onCardSelected(card);
                           }
                         : null,
-                    onIllegalTap: canHumanAct && !isLegal
-                        ? () {
-                            HapticService.instance.invalidMove();
-                          }
-                        : null,
+                    onIllegalTap: null,
                   ),
                 );
               },
@@ -1086,108 +1127,150 @@ class StageLawnBackgroundPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// Paints `<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>` from the HTML Back button.
+/// Paints a bold Back Arrow + Chevron emblem for the Leave Game button.
 class _BackChevronIconPainter extends CustomPainter {
   const _BackChevronIconPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
     final s = size.width / 24.0;
-    final path = Path()
-      ..moveTo(15 * s, 5 * s)
-      ..lineTo(8 * s, 12 * s)
-      ..lineTo(15 * s, 19 * s);
     final paint = Paint()
       ..color = const Color(0xFF2A2160)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.4 * s
+      ..strokeWidth = 3.2 * s
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
-    canvas.drawPath(path, paint);
+
+    final chevron = Path()
+      ..moveTo(11 * s, 6 * s)
+      ..lineTo(5 * s, 12 * s)
+      ..lineTo(11 * s, 18 * s);
+    canvas.drawPath(chevron, paint);
+
+    canvas.drawLine(Offset(6 * s, 12 * s), Offset(19 * s, 12 * s), paint);
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// Paints `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1"/></svg>`
+/// Paints a bold 8-Tooth Mechanical Settings Cog / Gear icon for the Settings & Pause button.
 class _SettingsGearIconPainter extends CustomPainter {
   const _SettingsGearIconPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
     final s = size.width / 24.0;
-    final paint = Paint()
+    final center = Offset(12 * s, 12 * s);
+
+    // Outer gear body ring + 8 sculpted gear teeth
+    final toothPaint = Paint()
       ..color = const Color(0xFF2A2160)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.4 * s
+      ..strokeWidth = 2.6 * s
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    canvas.drawCircle(Offset(12 * s, 12 * s), 3 * s, paint);
+    canvas.drawCircle(center, 6.6 * s, toothPaint);
 
-    final rays = Path()
-      ..moveTo(12 * s, 2.8 * s)
-      ..lineTo(12 * s, 5.8 * s)
-      ..moveTo(12 * s, 18.2 * s)
-      ..lineTo(12 * s, 21.2 * s)
-      ..moveTo(2.8 * s, 12 * s)
-      ..lineTo(5.8 * s, 12 * s)
-      ..moveTo(18.2 * s, 12 * s)
-      ..lineTo(21.2 * s, 12 * s)
-      ..moveTo(5.5 * s, 5.5 * s)
-      ..lineTo(7.6 * s, 7.6 * s)
-      ..moveTo(16.4 * s, 16.4 * s)
-      ..lineTo(18.5 * s, 18.5 * s)
-      ..moveTo(18.5 * s, 5.5 * s)
-      ..lineTo(16.4 * s, 7.6 * s)
-      ..moveTo(7.6 * s, 16.4 * s)
-      ..lineTo(5.5 * s, 18.5 * s);
-    canvas.drawPath(rays, paint);
+    final teeth = Path();
+    for (int i = 0; i < 8; i++) {
+      final angle = i * (math.pi / 4.0);
+      final rIn = 6.4 * s;
+      final rOut = 9.4 * s;
+      teeth.moveTo(
+        center.dx + math.cos(angle) * rIn,
+        center.dy + math.sin(angle) * rIn,
+      );
+      teeth.lineTo(
+        center.dx + math.cos(angle) * rOut,
+        center.dy + math.sin(angle) * rOut,
+      );
+    }
+    final teethStroke = Paint()
+      ..color = const Color(0xFF2A2160)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.4 * s
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(teeth, teethStroke);
+
+    // Inner hub fill + ring
+    final hubFill = Paint()
+      ..color = const Color(0xFF2A2160).withValues(alpha: 0.16)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, 3.4 * s, hubFill);
+
+    final hubStroke = Paint()
+      ..color = const Color(0xFF2A2160)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.6 * s;
+    canvas.drawCircle(center, 3.4 * s, hubStroke);
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// Paints a crisp History Clock-Arrow icon matching the #2A2160 stroke style of the table buttons.
+/// Paints a bold Card-History + Counter-Clockwise Clock-Arrow icon for the Last 5 Cards button.
 class _HistoryClockIconPainter extends CustomPainter {
   const _HistoryClockIconPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
     final s = size.width / 24.0;
-    final paint = Paint()
+    final arcPaint = Paint()
       ..color = const Color(0xFF2A2160)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.3 * s
+      ..strokeWidth = 3.0 * s
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
     // Circular history arc
-    final rect = Rect.fromCircle(center: Offset(12 * s, 12 * s), radius: 8.5 * s);
-    canvas.drawArc(rect, -2.35, 5.2, false, paint);
+    final rect = Rect.fromCircle(center: Offset(12 * s, 12 * s), radius: 8.8 * s);
+    canvas.drawArc(rect, -2.35, 5.2, false, arcPaint);
 
     // Counter-clockwise arrow head at top-left
     final arrow = Path()
-      ..moveTo(3.2 * s, 3.5 * s)
+      ..moveTo(3.2 * s, 3.4 * s)
       ..lineTo(3.2 * s, 8.2 * s)
-      ..lineTo(7.9 * s, 8.2 * s);
-    canvas.drawPath(arrow, paint);
+      ..lineTo(8.0 * s, 8.2 * s);
+    canvas.drawPath(arrow, arcPaint);
 
-    // Clock hands
+    // Mini card emblem inside the history dial
+    final cardRRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(9.2 * s, 7.2 * s, 6.4 * s, 9.2 * s),
+      Radius.circular(1.5 * s),
+    );
+    final cardFill = Paint()
+      ..color = const Color(0xFFD97706).withValues(alpha: 0.18)
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(cardRRect, cardFill);
+
+    final cardStroke = Paint()
+      ..color = const Color(0xFF2A2160)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.4 * s;
+    canvas.drawRRect(cardRRect, cardStroke);
+
+    // Clock hands inside mini card
     final hands = Path()
-      ..moveTo(12 * s, 7.5 * s)
-      ..lineTo(12 * s, 12 * s)
-      ..lineTo(15 * s, 14 * s);
-    canvas.drawPath(hands, paint);
+      ..moveTo(12.4 * s, 9.6 * s)
+      ..lineTo(12.4 * s, 12.2 * s)
+      ..lineTo(14.2 * s, 13.4 * s);
+    final handStroke = Paint()
+      ..color = const Color(0xFF2A2160)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.4 * s
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(hands, handStroke);
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// Paints a crisp Question Mark / Tutorial Help icon matching the #2A2160 stroke style of the table buttons.
+/// Paints a bold sculpted Question Mark / Tutorial Help icon for the Quick Tutorial button.
 class _TutorialHelpIconPainter extends CustomPainter {
   const _TutorialHelpIconPainter();
 
@@ -1197,20 +1280,26 @@ class _TutorialHelpIconPainter extends CustomPainter {
     final strokePaint = Paint()
       ..color = const Color(0xFF2A2160)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.4 * s
+      ..strokeWidth = 3.2 * s
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
     final curve = Path()
-      ..moveTo(9.1 * s, 9.0 * s)
-      ..cubicTo(9.5 * s, 6.2 * s, 14.5 * s, 6.2 * s, 14.9 * s, 9.2 * s)
-      ..cubicTo(15.2 * s, 11.4 * s, 12.0 * s, 12.0 * s, 12.0 * s, 14.2 * s);
+      ..moveTo(8.8 * s, 8.6 * s)
+      ..cubicTo(9.2 * s, 5.5 * s, 14.8 * s, 5.5 * s, 15.2 * s, 8.9 * s)
+      ..cubicTo(15.5 * s, 11.3 * s, 12.0 * s, 11.9 * s, 12.0 * s, 14.3 * s);
     canvas.drawPath(curve, strokePaint);
 
-    final dotPaint = Paint()
-      ..color = const Color(0xFF2A2160)
+    final dotFill = Paint()
+      ..color = const Color(0xFFD97706)
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(Offset(12.0 * s, 18.2 * s), 1.45 * s, dotPaint);
+    canvas.drawCircle(Offset(12.0 * s, 18.5 * s), 1.9 * s, dotFill);
+
+    final dotStroke = Paint()
+      ..color = const Color(0xFF2A2160)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2 * s;
+    canvas.drawCircle(Offset(12.0 * s, 18.5 * s), 1.9 * s, dotStroke);
   }
 
   @override

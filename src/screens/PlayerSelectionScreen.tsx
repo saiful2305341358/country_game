@@ -69,14 +69,18 @@ export const PlayerSelectionScreen: React.FC<PlayerSelectionScreenProps> = ({
         {/* 1. Top Header */}
         <div className="flex items-center justify-between">
           <button
+            type="button"
             onClick={() => {
               AudioService.playButtonClick();
               HapticService.uiTap();
               onBack();
             }}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-[#FFD54F] hover:bg-white/10 cursor-pointer"
+            style={{ touchAction: 'manipulation' }}
+            className="w-11 h-11 rounded-full bg-black/40 border border-[#FFD54F]/45 flex items-center justify-center text-[#FFD54F] hover:bg-white/15 active:scale-95 transition cursor-pointer shadow"
+            aria-label="Back"
+            title="Back"
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={22} strokeWidth={2.6} />
           </button>
 
           <div className="text-center">
@@ -95,7 +99,7 @@ export const PlayerSelectionScreen: React.FC<PlayerSelectionScreenProps> = ({
             </div>
           </div>
 
-          <div className="w-9 h-9 sm:w-10 sm:h-10" />
+          <div className="w-11 h-11" />
         </div>
 
         {/* 2. Player Count Selector Row */}

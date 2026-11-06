@@ -145,6 +145,8 @@ import UIKit
     activePlayers.removeAll()
   }
 
+  private lazy var heavyImpactGenerator = UIImpactFeedbackGenerator(style: .heavy)
+
   private func triggerHaptic(style: String) {
     switch style {
     case "light":
@@ -155,7 +157,11 @@ import UIKit
       selectionGenerator.selectionChanged()
     case "success":
       notificationGenerator.prepare()
+      heavyImpactGenerator.prepare()
       notificationGenerator.notificationOccurred(.success)
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) { [weak self] in
+        self?.heavyImpactGenerator.impactOccurred()
+      }
     case "warning":
       notificationGenerator.prepare()
       notificationGenerator.notificationOccurred(.warning)

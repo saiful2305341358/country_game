@@ -257,14 +257,30 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        SizedBox(
-          width: 40,
-          height: 40,
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.black.withValues(alpha: 0.40),
+            border: Border.all(
+              color: const Color(0xFFFFD54F).withValues(alpha: 0.45),
+              width: 1.5,
+            ),
+          ),
           child: IconButton(
             padding: EdgeInsets.zero,
             tooltip: 'Back',
-            icon: const Icon(Icons.arrow_back, color: Color(0xFFFFD54F)),
-            onPressed: () => Navigator.pop(context),
+            icon: const Icon(
+              Icons.arrow_back_rounded,
+              color: Color(0xFFFFD54F),
+              size: 22,
+            ),
+            onPressed: () {
+              AudioService.instance.playButtonClick();
+              HapticService.instance.uiTap();
+              Navigator.pop(context);
+            },
           ),
         ),
         Expanded(

@@ -591,31 +591,33 @@ class HapticServiceImpl {
   }
 
   cardTap() {
-    this.vibrate(14);
+    // No haptic vibration during card moves in play time
   }
   cardPass() {
-    this.vibrate(24);
+    // No haptic vibration during card moves in play time
   }
   invalidMove() {
-    this.vibrate([20, 45, 28]);
+    // No haptic vibration during card moves in play time
   }
   botTurnTick() {
-    this.vibrate(10);
+    // No haptic vibration during card moves in play time
   }
   yourTurnNotice() {
-    this.vibrate([16, 35, 24]);
+    // No haptic vibration during play time
   }
   dealShuffle() {
-    this.vibrate([12, 30, 14, 30, 18]);
+    // No haptic vibration during card dealing
   }
   victory() {
-    this.vibrate([40, 50, 50, 50, 90]);
+    // Real player win: strong celebratory 3-pulse vibration pattern
+    this.vibrate([75, 50, 95, 50, 150]);
   }
   roundEnd() {
-    this.vibrate([28, 60, 42]);
+    // Bot win: noticeably lighter, brief single pulse
+    this.vibrate(32);
   }
   uiTap() {
-    this.vibrate(12);
+    // No haptic vibration on routine UI/card taps during play
   }
 }
 
