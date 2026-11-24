@@ -16,9 +16,14 @@ Bot difficulty is chosen in **Settings** (see `lib/game/bot_strategy.dart`):
 - **Normal**: bots only see their own hand and play for themselves, but still occasionally pause their own collecting.
 - **Hard**: bots always pursue their strongest set.
 
-## Play with friends (Internet)
+## Play with friends
 
-Home → **Play with Friends** → **Play via Internet**. One player creates a room and shares its 3-digit code; friends join with the code. Every seat is a real player: a round starts with 3 to 7 players, people who join mid-round are dealt in from the next round, and the room stays open until the host closes it. Rooms run on Supabase; the database setup is in `supabase/rooms.sql`.
+Home → **Play with Friends**, then:
+
+- **Play via Internet**: rooms run on Supabase (database setup in `supabase/rooms.sql`), so friends can be anywhere.
+- **Play Nearby**: one phone turns on its hotspot (or everyone joins the same Wi-Fi) and hosts the room; no internet data is used. Available in the Android, iOS and desktop apps, not in the browser.
+
+One player creates a room and shares its 3-digit code; friends join with the code. Every seat is a real player: a round starts with 3 to 7 players, people who join mid-round are dealt in from the next round, and the room stays open until the host closes it.
 
 ## Running
 

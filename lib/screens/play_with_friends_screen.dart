@@ -3,7 +3,8 @@ import '../services/audio_service.dart';
 import '../services/haptic_service.dart';
 import '../widgets/game_logo.dart';
 import '../widgets/mode_card.dart';
-import 'internet_rooms_screen.dart';
+import '../online/lan/lan_rooms.dart';
+import 'room_entry_screen.dart';
 
 /// Lets the player choose how to connect with friends: over the Internet or
 /// on the same Wi-Fi / hotspot. Every seat is a real player (no bots); a round
@@ -70,13 +71,23 @@ class PlayWithFriendsScreen extends StatelessWidget {
                               subtitle:
                                   'Same Wi-Fi or hotspot · no internet needed',
                               accent: MenuColors.emerald,
-                              badge: 'COMING SOON',
+                              badge: LanRooms.isSupported ? null : 'APP ONLY',
                               compact: isCompactH,
                               onTap: () {
                                 _click();
-                                showMenuNotice(
+                                if (!LanRooms.isSupported) {
+                                  showMenuNotice(
+                                    context,
+                                    'Nearby play needs the Android, iPhone or '
+                                    'desktop app (browsers cannot use the local network).',
+                                  );
+                                  return;
+                                }
+                                Navigator.push(
                                   context,
-                                  'Nearby (Wi-Fi / hotspot) rooms are coming soon.',
+                                  MaterialPageRoute(
+                                    builder: (_) => const NearbyRoomsScreen(),
+                                  ),
                                 );
                               },
                             ),

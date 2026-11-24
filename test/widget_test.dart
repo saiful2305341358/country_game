@@ -1,7 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:country_game/main.dart';
-import 'package:country_game/screens/internet_rooms_screen.dart';
+import 'package:country_game/screens/room_entry_screen.dart';
 import 'package:country_game/screens/intro_video_screen.dart';
 import 'package:country_game/screens/main_menu_screen.dart';
 import 'package:country_game/screens/play_with_friends_screen.dart';

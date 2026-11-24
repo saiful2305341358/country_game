@@ -13,10 +13,14 @@ class RoomMember {
   final String name;
   final DateTime joinedAt;
 
+  /// False while the player's phone is reconnecting (nearby rooms only).
+  final bool connected;
+
   const RoomMember({
     required this.userId,
     required this.name,
     required this.joinedAt,
+    this.connected = true,
   });
 }
 
@@ -46,6 +50,9 @@ abstract class RoomSession extends ChangeNotifier {
 
   /// The last room event shown to everyone (e.g. "Sara left").
   String? get notice;
+
+  /// Extra connection details for the lobby (e.g. the host's local address).
+  String? get connectionInfo => null;
 
   /// A problem that the UI should show once (then it is cleared).
   String? takeError();

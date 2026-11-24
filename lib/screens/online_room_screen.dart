@@ -513,6 +513,17 @@ class _OnlineRoomScreenState extends State<OnlineRoomScreen> {
               fontSize: 11,
             ),
           ),
+          if (_room.connectionInfo != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              _room.connectionInfo!,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.45),
+                fontSize: 10.5,
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           TextButton.icon(
             onPressed: () {
@@ -574,6 +585,7 @@ class _OnlineRoomScreenState extends State<OnlineRoomScreen> {
                   ),
                   if (m.userId == _room.hostUserId) const _Tag('HOST'),
                   if (m.userId == _room.myUserId) const _Tag('YOU'),
+                  if (!m.connected) const _Tag('OFFLINE'),
                   if (inRound && !_room.seats.contains(m.userId))
                     const _Tag('NEXT ROUND'),
                 ],

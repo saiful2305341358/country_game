@@ -43,11 +43,12 @@ npm run lint                          # tsc --noEmit
 - Settings: `GameSettings.current` is a mutable global. `SettingsStore.load()` (in `main`) and `SettingsStore.save()` (in the Settings screen) persist it. Sound and haptic flags are persisted by their own services.
 - `StatsService` (singleton `ChangeNotifier`) keys player records by **name** ("You" for the human). Scoring is `computeRoundPoints` (set bonus + speed bonus), shared by the victory overlay and the stats.
 
-## Multiplayer (Internet rooms)
+## Multiplayer (Internet and nearby rooms)
 
 - `lib/online/` holds the multiplayer code; screens are `play_with_friends_screen.dart`, `internet_rooms_screen.dart` and `online_room_screen.dart` (lobby + table).
 - **The host's phone is the referee.** `HostReferee` runs the unchanged `GameEngine` (`startNewGame(playerNames: …)` for an all-human round, `loadState` + `makeMove` per move). Other phones insert move requests into `room_moves`; the host validates (round, turn, seat, legality), then writes the new state to `rooms.state`, and every phone receives it via Supabase Realtime.
-- `RoomSession` is the transport-neutral interface the UI uses; `SupabaseRoomSession` implements it (stage 3 nearby Wi-Fi play is meant to add another implementation).
+- `RoomSession` is the transport-neutral interface the UI uses (`OnlineRoomScreen`, `RoomEntryScreen`). Implementations: `SupabaseRoomSession` (Internet) and `LanHostSession` / `LanClientSession` (nearby).
+- **Nearby rooms** (`lib/online/lan/`): the host phone runs a WebSocket server on port 47820 and is the referee, exactly like Internet rooms; friends connect directly. The room code is the last number of the host's IPv4 address (192.168.43.1 → "001"), so a friend derives the host address from the code plus its own subnet (`LanProtocol`). UDP broadcasts on port 47821 add a best-effort "rooms nearby" list. A dropped phone keeps its seat for 20 s and reconnects with its `DeviceIdentity` id. `lan_rooms.dart` picks `lan_rooms_io.dart` or the browser stub `lan_rooms_web.dart` (no local sockets on web); keep `dart:io` out of files the web build imports.
 - Every phone renders `SeatView.forSeat(state, mySeat)`: the round rotated so the local player is seat 0 and the only `isHuman` player, because `PlayingTable` always draws `players[0]` at the bottom.
 - `GameStateCodec` serializes `GameState` to JSON. When `GameState`, `GamePlayer` or `GameCard` gain fields, update the codec (and `SeatView`) too.
 - Database schema, RLS policies and the `create_room` / `join_room` / `leave_room` functions live in `supabase/rooms.sql`; it is idempotent and is run by hand in the Supabase SQL Editor. Project URL and publishable key are in `lib/online/supabase_config.dart` (never a secret / service_role key).
@@ -55,6 +56,8 @@ npm run lint                          # tsc --noEmit
 - Network tests live in `tool/`, outside `test/`, so `flutter test` stays offline:
   - `flutter test tool/online_e2e_test.dart`: simulated phones play full rounds against the real project.
   - `ROOM_CODE=123 flutter test tool/friend_bots_test.dart`: two bot friends join a room you created, for manual testing.
+  - `flutter test tool/lan_e2e_test.dart`: a nearby room on this computer's real network address (discovery + join by code).
+  - `test/lan_test.dart` runs nearby rooms over localhost, so it stays in the normal suite.
 
 ## Conventions
 
