@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle2, HelpCircle, PlayCircle, Settings, Trophy, User } from 'lucide-react';
+import { CheckCircle2, HelpCircle, PlayCircle, Settings, Trophy } from 'lucide-react';
 import { GameLogo } from '../components/GameLogo';
 import { BilingualRulesDialog, PlayerStatsOverlay } from '../components/Overlays';
 import { AudioService, HapticService } from '../services/soundSynthesizer';
@@ -7,13 +7,11 @@ import { AudioService, HapticService } from '../services/soundSynthesizer';
 interface MainMenuScreenProps {
   onPlayGame: () => void;
   onOpenSettings: () => void;
-  onOpenProfile: () => void;
 }
 
 export const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
   onPlayGame,
   onOpenSettings,
-  onOpenProfile,
 }) => {
   const [showRules, setShowRules] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -71,18 +69,6 @@ export const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
           >
             <PlayCircle size={22} />
             PLAY GAME
-          </button>
-
-          <button
-            onClick={() => {
-              AudioService.playButtonClick();
-              HapticService.uiTap();
-              onOpenProfile();
-            }}
-            className="w-full py-2 sm:py-2.5 rounded-[12px] border-[1.2px] border-[#10B981]/75 bg-[#10B981]/10 text-[#FFE082] hover:bg-[#10B981]/20 active:scale-[0.99] font-bold text-[11.5px] sm:text-xs tracking-wider flex items-center justify-center gap-2 transition cursor-pointer"
-          >
-            <User size={17} className="text-[#10B981]" />
-            PROFILE
           </button>
 
           <button

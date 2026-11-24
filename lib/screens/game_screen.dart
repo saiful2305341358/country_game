@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../game/game_engine.dart';
@@ -44,7 +43,6 @@ class _GameScreenState extends State<GameScreen>
   bool _hasRecordedWinningSetForMatch = false;
   bool _hasStartedFirstMatch = false;
   int _lastTurnCount = 0;
-  final Stopwatch _matchStopwatch = Stopwatch();
 
   // Celebration particle state triggered strictly when a player completes a winning set
   bool _showCelebrationParticles = false;
@@ -104,9 +102,6 @@ class _GameScreenState extends State<GameScreen>
     _showStatsOverlay = false;
     _hasRecordedWinningSetForMatch = false;
     _showCelebrationParticles = false;
-    _matchStopwatch
-      ..reset()
-      ..start();
 
     _engine.updateSettings(GameSettings.current);
     _engine.startNewGame(
@@ -161,16 +156,6 @@ class _GameScreenState extends State<GameScreen>
       }
     }
 
-    // Win time counts active play only (matches the web version): the clock
-    // stops while the game is paused, the tutorial/history is open, or dealing.
-    if (!_hasRecordedWinningSetForMatch) {
-      if (_engine.isPaused) {
-        _matchStopwatch.stop();
-      } else if (!_matchStopwatch.isRunning) {
-        _matchStopwatch.start();
-      }
-    }
-
     setState(() {});
   }
 
@@ -211,14 +196,11 @@ class _GameScreenState extends State<GameScreen>
 
       if (!_hasRecordedWinningSetForMatch) {
         _hasRecordedWinningSetForMatch = true;
-        _matchStopwatch.stop();
-        final elapsedSec = math.max(1, _matchStopwatch.elapsed.inSeconds);
         StatsService.instance.recordSetCompleted(
           winner,
           winningType,
           totalPlayers: state.totalPlayers,
           turnCount: state.turnCount,
-          durationSeconds: elapsedSec,
         );
       }
 

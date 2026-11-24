@@ -10,7 +10,6 @@ import 'package:country_game/game/move_validator.dart';
 import 'package:country_game/game/winner_detector.dart';
 import 'package:country_game/game/bot_strategy.dart';
 import 'package:country_game/game/game_engine.dart';
-import 'package:country_game/services/stats_service.dart';
 
 void main() {
   group('1-3: Initialization & Dynamic Winning Set Size for 3, 4, 5, 6 players', () {
@@ -435,25 +434,6 @@ void main() {
         }
         engine.makeMove(BotStrategy.chooseDiscard(state: state));
       }
-    });
-
-    test('Win times only contain real recorded durations', () {
-      final stats = StatsService.instance;
-      stats.resetStats();
-      final deck = CardDeckFactory.createDeck(3);
-      final players = InitialExchangeService.performInitialExchange(
-        activeTypes: deck.activeTypes,
-        initialDeckByType: deck.ordinaryCardsByType,
-      );
-      stats.recordGameStarted(players);
-      stats.recordSetCompleted(players[0], deck.activeTypes.first);
-      expect(stats.humanWins, equals(1));
-      expect(stats.humanWinTimesSeconds, isEmpty);
-
-      stats.recordGameStarted(players);
-      stats.recordSetCompleted(players[0], deck.activeTypes.first, durationSeconds: 742);
-      expect(stats.humanWinTimesSeconds, equals([742]));
-      stats.resetStats();
     });
   });
 }

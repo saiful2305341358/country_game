@@ -31,7 +31,6 @@ export function computeRoundPoints(totalPlayers: number, turnCount: number): {
 class StatsServiceImpl {
   private _totalGamesPlayed = 0;
   private _playerRecords: Map<string, PlayerStatsRecord> = new Map();
-  private _humanWinTimesSeconds: number[] = [];
   private _listeners: Set<() => void> = new Set();
 
   constructor() {
@@ -61,55 +60,6 @@ class StatsServiceImpl {
       sum += r.setsCompleted;
     }
     return sum;
-  }
-
-  get humanRecord(): PlayerStatsRecord {
-    const records = this.getAllRecords();
-    return (
-      records.find((r) => r.isHuman) ?? {
-        name: 'You',
-        isHuman: true,
-        avatarIndex: 0,
-        gamesPlayed: this._totalGamesPlayed,
-        setsCompleted: 0,
-        totalPoints: 0,
-        lastRoundPoints: 0,
-      }
-    );
-  }
-
-  get humanGamesPlayed(): number {
-    const rec = this.humanRecord;
-    return Math.max(this._totalGamesPlayed, rec.gamesPlayed);
-  }
-
-  get humanWins(): number {
-    return this.humanRecord.setsCompleted;
-  }
-
-  get humanWinPercentage(): number {
-    const played = this.humanGamesPlayed;
-    const wins = this.humanWins;
-    if (played <= 0) return 0;
-    return Math.min(100, Math.round((wins / played) * 1000) / 10);
-  }
-
-  get humanWinTimesSeconds(): number[] {
-    // Real, recorded win durations only; untimed wins are not represented.
-    return [...this._humanWinTimesSeconds];
-  }
-
-  get averageWinTimeSeconds(): number {
-    const times = this.humanWinTimesSeconds;
-    if (times.length === 0) return 0;
-    const sum = times.reduce((acc, val) => acc + val, 0);
-    return Math.round(sum / times.length);
-  }
-
-  get fastestWinTimeSeconds(): number {
-    const times = this.humanWinTimesSeconds;
-    if (times.length === 0) return 0;
-    return Math.min(...times);
   }
 
   getRecordForPlayer(player: GamePlayer): PlayerStatsRecord {
@@ -172,8 +122,7 @@ class StatsServiceImpl {
     player: GamePlayer,
     type: CountryType,
     totalPlayers = 4,
-    turnCount = 1,
-    durationSeconds?: number
+    turnCount = 1
   ): PlayerStatsRecord {
     const existing = this.getRecordForPlayer(player);
     const { roundPoints } = computeRoundPoints(totalPlayers, turnCount);
@@ -187,12 +136,6 @@ class StatsServiceImpl {
       lastCompletedCountry: type,
     };
     this._playerRecords.set(player.name, updated);
-
-    if (player.isHuman && typeof durationSeconds === 'number' && durationSeconds > 0) {
-      const duration = Math.max(1, Math.round(durationSeconds));
-      this._humanWinTimesSeconds = [...this._humanWinTimesSeconds, duration].slice(-12);
-    }
-
     this.saveToStorage();
     this.notify();
     return updated;
@@ -201,7 +144,6 @@ class StatsServiceImpl {
   resetStats(currentPlayers?: GamePlayer[]) {
     this._totalGamesPlayed = 0;
     this._playerRecords.clear();
-    this._humanWinTimesSeconds = [];
     if (currentPlayers) {
       for (const p of currentPlayers) {
         this._playerRecords.set(p.name, {
@@ -230,12 +172,6 @@ class StatsServiceImpl {
       const decoded = JSON.parse(raw);
       this._totalGamesPlayed =
         typeof decoded.totalGamesPlayed === 'number' ? decoded.totalGamesPlayed : 0;
-      if (Array.isArray(decoded.humanWinTimesSeconds)) {
-        this._humanWinTimesSeconds = decoded.humanWinTimesSeconds
-          .filter((n: unknown): n is number => typeof n === 'number' && n > 0 && Number.isFinite(n))
-          .map((n: number) => Math.round(n))
-          .slice(-12);
-      }
       if (decoded.players && typeof decoded.players === 'object') {
         this._playerRecords.clear();
         for (const [key, val] of Object.entries(decoded.players)) {
@@ -277,7 +213,6 @@ class StatsServiceImpl {
         STORAGE_KEY,
         JSON.stringify({
           totalGamesPlayed: this._totalGamesPlayed,
-          humanWinTimesSeconds: this._humanWinTimesSeconds,
           players: playersObj,
         })
       );

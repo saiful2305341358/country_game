@@ -4,7 +4,6 @@ import '../services/haptic_service.dart';
 import '../widgets/game_logo.dart';
 import '../widgets/player_stats_overlay.dart';
 import 'player_selection_screen.dart';
-import 'profile_screen.dart';
 import 'settings_screen.dart';
 
 class MainMenuScreen extends StatelessWidget {
@@ -155,51 +154,6 @@ class MainMenuScreen extends StatelessWidget {
                                     MaterialPageRoute(
                                       builder: (_) =>
                                           const PlayerSelectionScreen(),
-                                    ),
-                                  );
-                                },
-                              ),
-
-                              SizedBox(height: isCompactH ? 8 : 10),
-
-                              // Profile Screen Button
-                              OutlinedButton.icon(
-                                icon: const Icon(
-                                  Icons.person_outline_rounded,
-                                  size: 19,
-                                  color: Color(0xFF10B981),
-                                ),
-                                label: const Text(
-                                  'PROFILE',
-                                  style: TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1,
-                                  ),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFFFFE082),
-                                  backgroundColor: const Color(0xFF10B981)
-                                      .withValues(alpha: 0.10),
-                                  side: BorderSide(
-                                    color: const Color(0xFF10B981)
-                                        .withValues(alpha: 0.75),
-                                    width: 1.2,
-                                  ),
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: isCompactH ? 10 : 12,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                onPressed: () {
-                                  AudioService.instance.playButtonClick();
-                                  HapticService.instance.uiTap();
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => const ProfileScreen(),
                                     ),
                                   );
                                 },

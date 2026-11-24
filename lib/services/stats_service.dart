@@ -105,7 +105,6 @@ class StatsService extends ChangeNotifier {
   }
 
   int _totalGamesPlayed = 0;
-  final List<int> _humanWinTimesSeconds = <int>[];
   final Map<String, PlayerStatsRecord> _playerRecords =
       <String, PlayerStatsRecord>{};
 
@@ -119,55 +118,6 @@ class StatsService extends ChangeNotifier {
         0,
         (sum, record) => sum + record.setsCompleted,
       );
-
-  PlayerStatsRecord get humanRecord {
-    final all = getAllRecords();
-    for (final r in all) {
-      if (r.isHuman) return r;
-    }
-    return PlayerStatsRecord(
-      name: 'You',
-      isHuman: true,
-      avatarIndex: 0,
-      gamesPlayed: _totalGamesPlayed,
-      setsCompleted: 0,
-    );
-  }
-
-  int get humanGamesPlayed {
-    final rec = humanRecord;
-    return _totalGamesPlayed > rec.gamesPlayed
-        ? _totalGamesPlayed
-        : rec.gamesPlayed;
-  }
-
-  int get humanWins => humanRecord.setsCompleted;
-
-  double get humanWinPercentage {
-    final played = humanGamesPlayed;
-    final wins = humanWins;
-    if (played <= 0) return 0.0;
-    final pct = (wins / played) * 100.0;
-    return pct > 100.0 ? 100.0 : pct;
-  }
-
-  /// Real, recorded win durations only (most recent last). Wins recorded before
-  /// timing was tracked have no duration and are not represented here.
-  List<int> get humanWinTimesSeconds =>
-      List<int>.unmodifiable(_humanWinTimesSeconds);
-
-  int get averageWinTimeSeconds {
-    final times = humanWinTimesSeconds;
-    if (times.isEmpty) return 0;
-    final sum = times.fold<int>(0, (acc, v) => acc + v);
-    return (sum / times.length).round();
-  }
-
-  int get fastestWinTimeSeconds {
-    final times = humanWinTimesSeconds;
-    if (times.isEmpty) return 0;
-    return times.reduce((a, b) => a < b ? a : b);
-  }
 
   PlayerStatsRecord getRecordForPlayer(GamePlayer player) {
     return _playerRecords[player.name] ??
@@ -239,7 +189,6 @@ class StatsService extends ChangeNotifier {
     CountryType type, {
     int totalPlayers = 4,
     int turnCount = 1,
-    int? durationSeconds,
   }) {
     final existing = getRecordForPlayer(player);
     final score = computeRoundPoints(
@@ -254,12 +203,6 @@ class StatsService extends ChangeNotifier {
       lastRoundPoints: score.roundPoints,
       lastCompletedCountry: type,
     );
-    if (player.isHuman && durationSeconds != null && durationSeconds > 0) {
-      _humanWinTimesSeconds.add(durationSeconds);
-      if (_humanWinTimesSeconds.length > 12) {
-        _humanWinTimesSeconds.removeRange(0, _humanWinTimesSeconds.length - 12);
-      }
-    }
     _saveToStorage();
     notifyListeners();
   }
@@ -267,7 +210,6 @@ class StatsService extends ChangeNotifier {
   /// Resets all games played and sets completed statistics.
   void resetStats({List<GamePlayer>? currentPlayers}) {
     _totalGamesPlayed = 0;
-    _humanWinTimesSeconds.clear();
     _playerRecords.clear();
     if (currentPlayers != null) {
       for (final p in currentPlayers) {
@@ -296,21 +238,6 @@ class StatsService extends ChangeNotifier {
     try {
       final decoded = jsonDecode(raw) as Map<String, dynamic>;
       _totalGamesPlayed = (decoded['totalGamesPlayed'] as int?) ?? 0;
-      _humanWinTimesSeconds.clear();
-      final rawTimes = decoded['humanWinTimesSeconds'];
-      if (rawTimes is List) {
-        for (final item in rawTimes) {
-          if (item is num && item > 0) {
-            _humanWinTimesSeconds.add(item.round());
-          }
-        }
-        if (_humanWinTimesSeconds.length > 12) {
-          _humanWinTimesSeconds.removeRange(
-            0,
-            _humanWinTimesSeconds.length - 12,
-          );
-        }
-      }
       final recordsMap = decoded['players'] as Map<String, dynamic>?;
       if (recordsMap != null) {
         _playerRecords.clear();
@@ -329,7 +256,6 @@ class StatsService extends ChangeNotifier {
     try {
       final data = <String, dynamic>{
         'totalGamesPlayed': _totalGamesPlayed,
-        'humanWinTimesSeconds': _humanWinTimesSeconds,
         'players': _playerRecords.map(
           (key, value) => MapEntry(key, value.toJson()),
         ),
