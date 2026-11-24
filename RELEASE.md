@@ -9,7 +9,7 @@ Format: `- [ ] Short title — what and why`
 - Android release builds work (Android Gradle Plugin 9.3.1, Kotlin 2.4.20, Gradle 9.5.0). Supports Android 7.0 (API 24) to Android 16 (API 36); native libraries are 16 KB page-aligned, as Play requires. See **Final build commands** below.
 - Not yet tested on a real phone. iOS has never been built (it needs a Mac).
 - App ID is still `com.example.country_game` (Android) / `com.example.countryGame` (iOS). Both stores reject or discourage `com.example`.
-- Release builds are signed with the **debug key**. Google Play rejects that.
+- Release builds are signed with the **debug key** until `android/key.properties` is created (the upload key itself exists; see section 2). Google Play rejects debug-signed builds.
 
 ---
 
@@ -89,10 +89,17 @@ The `.aab` build prints "The generated ELF library contains unobfuscated DWARF d
   2. Move `android/app/src/main/kotlin/com/example/country_game/MainActivity.kt` into a folder that matches the new ID and update its `package` line.
   3. Update the `-keep class com.example.country_game.**` line in `android/app/proguard-rules.pro`.
   4. Optional: the MethodChannel name `com.example.country_game/native_feedback` can stay as it is. It is only a label. If you change it, change all five places together: `MainActivity.kt`, `ios/Runner/AppDelegate.swift`, and `haptic_service_stub.dart`, `audio_service_stub.dart` and `stats_storage_stub.dart` in `lib/services/`.
-- [ ] **Create an upload key and sign release builds with it.**
-  1. Run `keytool -genkey -v -keystore ~/upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload`.
-  2. Create `android/key.properties` with the keystore path, alias and passwords. It is already ignored by git. **Never commit the `.jks` file or `key.properties`; back them up somewhere safe.**
-  3. In `android/app/build.gradle.kts`, add a `release` signing config that reads `key.properties` and use it instead of `signingConfigs.getByName("debug")`.
+- [ ] **Create an upload key and sign release builds with it.** (Steps 1 and 3 done; step 2 still to do.)
+  1. [x] Key created at `/home/saiful/upload-keystore.jks` (alias `upload`), with `/opt/android-studio/jbr/bin/keytool -genkey -v -keystore ~/upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload`.
+  2. [ ] Create `android/key.properties` (ignored by git):
+     ```properties
+     storePassword=YOUR_PASSWORD
+     keyPassword=YOUR_PASSWORD
+     keyAlias=upload
+     storeFile=/home/saiful/upload-keystore.jks
+     ```
+     **Never commit the `.jks` file or `key.properties`; back them up somewhere safe.**
+  3. [x] `android/app/build.gradle.kts` signs release builds with this key whenever `key.properties` exists; without it, it falls back to the debug key (builds work, but Play rejects them).
   4. Guide: https://docs.flutter.dev/deployment/android
 - [x] **Raise build tool versions** to remove the "support will soon be dropped" warnings: Android Gradle Plugin 9.3.1 and Kotlin 2.4.20 in `android/settings.gradle.kts`.
 - [ ] **Build the bundle:** see **Final build commands** below. Play needs `.aab`, not `.apk`.
