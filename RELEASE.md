@@ -8,7 +8,7 @@ Format: `- [ ] Short title — what and why`
 
 - Android release builds work (Android Gradle Plugin 9.3.1, Kotlin 2.4.20, Gradle 9.5.0). Supports Android 7.0 (API 24) to Android 16 (API 36); native libraries are 16 KB page-aligned, as Play requires. See **Final build commands** below.
 - Not yet tested on a real phone. iOS has never been built (it needs a Mac).
-- App ID is still `com.example.country_game` (Android) / `com.example.countryGame` (iOS). Both stores reject or discourage `com.example`.
+- App ID is `com.saiful.countrygame` on Android, iOS, macOS and Linux.
 - Release builds are signed with the **debug key** until `android/key.properties` is created (the upload key itself exists; see section 2). Google Play rejects debug-signed builds.
 
 ---
@@ -16,7 +16,7 @@ Format: `- [ ] Short title — what and why`
 ## 1. Both stores
 
 ### App identity
-- [ ] **Choose the final app ID**, for example `com.yourname.countrygame`. It can never be changed after the first upload, so pick it carefully. Use the same ID on Android and iOS.
+- [x] **Final app ID: `com.saiful.countrygame`** (same on Android and iOS). It can never be changed after the first upload.
 - [ ] **Final app name.** It is "Country Game" in `AndroidManifest.xml` (`android:label`) and in `ios/Runner/Info.plist` (`CFBundleDisplayName`). Check that the name is not already taken in the stores.
 - [ ] **App icon.** Make sure the icons in `android/app/src/main/res/mipmap-*` and `ios/Runner/Assets.xcassets/AppIcon.appiconset` are the final design, not Flutter's default. The `flutter_launcher_icons` package can generate every size from one 1024×1024 image.
 - [ ] **Version number.** `version: 1.0.0+1` in `pubspec.yaml`. The part after `+` (the build number) must go up with **every** upload to either store.
@@ -84,11 +84,7 @@ The `.aab` build prints "The generated ELF library contains unobfuscated DWARF d
 ## 2. Google Play (Android)
 
 ### Code and build
-- [ ] **Change the Android app ID.**
-  1. In `android/app/build.gradle.kts`, change both `namespace` and `applicationId`.
-  2. Move `android/app/src/main/kotlin/com/example/country_game/MainActivity.kt` into a folder that matches the new ID and update its `package` line.
-  3. Update the `-keep class com.example.country_game.**` line in `android/app/proguard-rules.pro`.
-  4. Optional: the MethodChannel name `com.example.country_game/native_feedback` can stay as it is. It is only a label. If you change it, change all five places together: `MainActivity.kt`, `ios/Runner/AppDelegate.swift`, and `haptic_service_stub.dart`, `audio_service_stub.dart` and `stats_storage_stub.dart` in `lib/services/`.
+- [x] **Change the Android app ID** to `com.saiful.countrygame`: `namespace` and `applicationId` in `android/app/build.gradle.kts`, `MainActivity.kt` moved to `android/app/src/main/kotlin/com/saiful/countrygame/`, and the keep rule in `android/app/proguard-rules.pro`. The internal MethodChannel name `com.example.country_game/native_feedback` stays as it is: it is only a label inside the app and players never see it.
 - [ ] **Create an upload key and sign release builds with it.** (Steps 1 and 3 done; step 2 still to do.)
   1. [x] Key created at `/home/saiful/upload-keystore.jks` (alias `upload`), with `/opt/android-studio/jbr/bin/keytool -genkey -v -keystore ~/upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload`.
   2. [ ] Create `android/key.properties` (ignored by git):
@@ -131,7 +127,7 @@ The `.aab` build prints "The generated ELF library contains unobfuscated DWARF d
 - [ ] **Apple Developer Program membership** (US$99 per year).
 
 ### Code and build
-- [ ] **Change the bundle ID** in Xcode (Runner target → Signing & Capabilities), or replace `com.example.countryGame` in `ios/Runner.xcodeproj/project.pbxproj`. Also update the `RunnerTests` entries.
+- [x] **Bundle ID** is `com.saiful.countrygame` in `ios/Runner.xcodeproj/project.pbxproj` (tests: `com.saiful.countrygame.RunnerTests`). Register the same ID in your Apple Developer account (Identifiers) before the first upload.
 - [ ] **Set the signing team** in Xcode (Runner → Signing & Capabilities → Team). Automatic signing is easiest.
 - [x] **iPad, landscape only: add `UIRequiresFullScreen` = `true` to `ios/Runner/Info.plist`.** The app supports only landscape. Without this key, App Store upload validation fails for iPad, because iPad multitasking apps must support all four orientations.
 - [x] **Export compliance:** add `ITSAppUsesNonExemptEncryption` = `false` to `Info.plist`. The app only uses standard HTTPS/TLS, which is exempt, so Apple stops asking on every upload.

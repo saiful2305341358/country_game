@@ -1,4 +1,4 @@
-package com.example.country_game
+package com.saiful.countrygame
 
 import android.content.Context
 import android.content.pm.ActivityInfo
