@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../game/card_deck_factory.dart';
 import '../models/card_type.dart';
 import '../models/game_card.dart';
@@ -332,15 +332,19 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 2),
-              Text(
-                'Win by collecting $_selectedPlayers cards of the same country (${_selectedPlayers * _selectedPlayers} country cards in deck)',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.80),
-                  fontSize: isCompactH ? 10.5 : 11.5,
+              // No gap on compact heights: the fixed 42px header has no spare room there.
+              SizedBox(height: isCompactH ? 0 : 2),
+              // Flexible so larger text scales clip the subtitle instead of overflowing the header.
+              Flexible(
+                child: Text(
+                  'Win by collecting $_selectedPlayers cards of the same country (${_selectedPlayers * _selectedPlayers} country cards in deck)',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.80),
+                    fontSize: isCompactH ? 10.5 : 11.5,
+                  ),
                 ),
               ),
             ],

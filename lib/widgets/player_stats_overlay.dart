@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../models/card_type.dart';
 import '../models/game_player.dart';
 import '../services/audio_service.dart';

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'screens/intro_video_screen.dart';
 import 'screens/main_menu_screen.dart';

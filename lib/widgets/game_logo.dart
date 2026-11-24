@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Official responsive vector logo for Country Card Game.
 /// Combines the central GLOBAL wild-starter card, a latitude/longitude globe with a tilted

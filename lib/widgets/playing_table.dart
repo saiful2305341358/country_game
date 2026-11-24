@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../models/game_card.dart';
 import '../models/game_player.dart';
 import '../models/game_state.dart';
