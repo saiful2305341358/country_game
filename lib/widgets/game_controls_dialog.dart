@@ -6,8 +6,6 @@ class GameControlsDialog extends StatefulWidget {
   final VoidCallback onResume;
   final VoidCallback onRestart;
   final VoidCallback onMainMenu;
-  final VoidCallback? onShowStats;
-  final VoidCallback? onShowTutorial;
   final bool soundEnabled;
   final ValueChanged<bool> onSoundToggle;
   final bool hapticsEnabled;
@@ -18,8 +16,6 @@ class GameControlsDialog extends StatefulWidget {
     required this.onResume,
     required this.onRestart,
     required this.onMainMenu,
-    this.onShowStats,
-    this.onShowTutorial,
     required this.onSoundToggle,
     required this.soundEnabled,
     this.hapticsEnabled = true,
@@ -203,7 +199,8 @@ class _GameControlsDialogState extends State<GameControlsDialog> {
                                 setState(() => _hapticsEnabled = val);
                                 HapticService.instance.isHapticsEnabled = val;
                                 if (val) {
-                                  HapticService.instance.cardTap();
+                                  // Preview the end-of-match pulse (the only in-game vibration)
+                                  HapticService.instance.roundEnd();
                                 }
                                 widget.onHapticsToggle?.call(val);
                               },

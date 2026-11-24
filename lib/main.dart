@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'models/game_settings.dart';
 import 'screens/intro_video_screen.dart';
 import 'screens/main_menu_screen.dart';
-import 'services/audio_service.dart';
-import 'services/haptic_service.dart';
+import 'services/settings_store.dart';
 import 'services/stats_service.dart';
 import 'services/stats_storage_stub.dart'
     if (dart.library.html) 'services/stats_storage_web.dart';
@@ -25,10 +23,7 @@ Future<void> main() async {
   await _enforceLandscapeSystemUI();
   await StatsStorage.init();
   StatsService.instance.reloadFromStorage();
-  GameSettings.current = GameSettings.current.copyWith(
-    soundEnabled: AudioService.instance.isSoundEnabled,
-    hapticsEnabled: HapticService.instance.isHapticsEnabled,
-  );
+  SettingsStore.load();
 
   final bool alreadyPlayedIntro =
       _hasShownIntroInProcess || StatsStorage.read(_kSessionIntroKey) == '1';

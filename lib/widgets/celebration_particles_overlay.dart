@@ -42,7 +42,7 @@ class _CelebrationParticle {
 }
 
 /// A particle-based celebration overlay that triggers on the game screen when a player
-/// completes a 'four-of-a-kind' / winning set of country cards.
+/// completes a winning N-card set of country cards.
 ///
 /// Optimized for low-end mobile GPUs (pre-cached unit star path, zero per-frame allocations,
 /// and zero offscreen `MaskFilter.blur` passes).

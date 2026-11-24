@@ -44,7 +44,7 @@ class GameEngine extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Starts a new game with [totalPlayers] (3, 4, 5, or 6).
+  /// Starts a new game with [totalPlayers] (3 to 7).
   /// If [deferBotStart] is true, bot turns wait until [resumeActivePlay] is called
   /// (used while the initial card dealing animation plays on screen).
   void startNewGame({
@@ -328,7 +328,9 @@ class GameEngine extends ChangeNotifier {
           state: _state!,
           baseDelayMs: _settings.botDelayMs,
         );
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('BotStrategy.evaluateDecision failed: $e');
+      }
     }
 
     final int computedThinkMs = precomputedDecision?.thinkDelayMs ??

@@ -95,20 +95,8 @@ class StatsServiceImpl {
   }
 
   get humanWinTimesSeconds(): number[] {
-    if (this._humanWinTimesSeconds.length > 0) {
-      return [...this._humanWinTimesSeconds];
-    }
-    const wins = this.humanWins;
-    if (wins > 0) {
-      // Backfill deterministic win times for wins recorded prior to timer tracking
-      const fallback: number[] = [];
-      const count = Math.min(10, wins);
-      for (let i = 0; i < count; i++) {
-        fallback.push(32 + ((i * 7) % 19));
-      }
-      return fallback;
-    }
-    return [];
+    // Real, recorded win durations only; untimed wins are not represented.
+    return [...this._humanWinTimesSeconds];
   }
 
   get averageWinTimeSeconds(): number {
@@ -200,12 +188,9 @@ class StatsServiceImpl {
     };
     this._playerRecords.set(player.name, updated);
 
-    if (player.isHuman) {
-      const computedDuration =
-        typeof durationSeconds === 'number' && durationSeconds > 0
-          ? Math.max(5, Math.min(600, Math.round(durationSeconds)))
-          : Math.max(12, Math.min(300, Math.round(turnCount * (totalPlayers * 0.85) + 8)));
-      this._humanWinTimesSeconds = [...this._humanWinTimesSeconds, computedDuration].slice(-12);
+    if (player.isHuman && typeof durationSeconds === 'number' && durationSeconds > 0) {
+      const duration = Math.max(1, Math.round(durationSeconds));
+      this._humanWinTimesSeconds = [...this._humanWinTimesSeconds, duration].slice(-12);
     }
 
     this.saveToStorage();

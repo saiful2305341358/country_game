@@ -112,6 +112,14 @@ class CardDeckFactory {
     List<CountryType>? predefinedTypes,
     Random? random,
   }) {
+    if (predefinedTypes != null &&
+        (predefinedTypes.length != totalPlayers ||
+            predefinedTypes.toSet().length != totalPlayers)) {
+      throw ArgumentError(
+        'predefinedTypes must contain $totalPlayers distinct countries, '
+        'got $predefinedTypes',
+      );
+    }
     final activeTypes = predefinedTypes ??
         selectActiveTypes(totalPlayers, random: random);
 

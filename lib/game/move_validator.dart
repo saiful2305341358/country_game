@@ -31,24 +31,9 @@ class MoveValidator {
       );
     }
 
-    // Opening move exemption: when table card is Starting Card
-    if (state.isOpeningMove && state.tableCard.isStartingCard) {
-      return const MoveValidationResult.success();
-    }
-
-    // If table card is Starting Card (re-placed later in game)
-    if (state.tableCard.isStartingCard) {
-      return const MoveValidationResult.success();
-    }
-
-    // If candidate card to discard is the Starting Card
-    if (discardCard.isStartingCard) {
-      return const MoveValidationResult.success();
-    }
-
-    // Same-type exchange restriction:
-    // "A player cannot discard a card of the same ordinary type as the card currently on the table."
-    if (discardCard.type == state.tableCard.type) {
+    // The legality rules live in one place (GameState.isLegalDiscard); the only
+    // remaining way to fail here is the same-type restriction.
+    if (!state.isLegalDiscard(discardCard)) {
       final typeName = state.tableCard.type?.displayName ?? 'this country';
       return MoveValidationResult.failure(
         'Same-Type Restriction: You cannot discard a $typeName card when a $typeName card is on the table.',

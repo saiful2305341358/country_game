@@ -10,6 +10,7 @@ import 'package:country_game/game/move_validator.dart';
 import 'package:country_game/game/winner_detector.dart';
 import 'package:country_game/game/bot_strategy.dart';
 import 'package:country_game/game/game_engine.dart';
+import 'package:country_game/services/stats_service.dart';
 
 void main() {
   group('1-3: Initialization & Dynamic Winning Set Size for 3, 4, 5, 6 players', () {
@@ -397,6 +398,62 @@ void main() {
       expect(engine.verifyIntegrity(), isTrue);
       expect(engine.state!.turnCount, equals(0));
       expect(engine.state!.isOpeningMove, isTrue);
+    });
+  });
+
+  group('Consistency fixes', () {
+    test('createDeck rejects predefinedTypes that do not match the player count', () {
+      expect(
+        () => CardDeckFactory.createDeck(
+          4,
+          predefinedTypes: const [CountryType.japan, CountryType.iran, CountryType.brazil],
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => CardDeckFactory.createDeck(
+          3,
+          predefinedTypes: const [CountryType.japan, CountryType.japan, CountryType.iran],
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('MoveValidator agrees with GameState.isLegalDiscard for every card', () {
+      final engine = GameEngine(
+        initialSettings: const GameSettings(animationsEnabled: false),
+      );
+      engine.startNewGame(totalPlayers: 5, randomSeed: 99);
+      for (int turn = 0; turn < 12 && !engine.state!.isGameOver; turn++) {
+        final state = engine.state!;
+        for (final card in state.currentPlayer.hand) {
+          final result = MoveValidator.validateMove(state: state, discardCard: card);
+          expect(result.isValid, equals(state.isLegalDiscard(card)));
+          if (!result.isValid) {
+            expect(result.errorMessage, contains('Same-Type Restriction'));
+          }
+        }
+        engine.makeMove(BotStrategy.chooseDiscard(state: state));
+      }
+    });
+
+    test('Win times only contain real recorded durations', () {
+      final stats = StatsService.instance;
+      stats.resetStats();
+      final deck = CardDeckFactory.createDeck(3);
+      final players = InitialExchangeService.performInitialExchange(
+        activeTypes: deck.activeTypes,
+        initialDeckByType: deck.ordinaryCardsByType,
+      );
+      stats.recordGameStarted(players);
+      stats.recordSetCompleted(players[0], deck.activeTypes.first);
+      expect(stats.humanWins, equals(1));
+      expect(stats.humanWinTimesSeconds, isEmpty);
+
+      stats.recordGameStarted(players);
+      stats.recordSetCompleted(players[0], deck.activeTypes.first, durationSeconds: 742);
+      expect(stats.humanWinTimesSeconds, equals([742]));
+      stats.resetStats();
     });
   });
 }

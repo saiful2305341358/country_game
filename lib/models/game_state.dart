@@ -75,6 +75,8 @@ class GameState {
   /// Dynamic winning set size equals totalPlayers (N).
   int get winningSetSize => totalPlayers;
 
+  /// Single source of truth for discard legality (MoveValidator and the bots
+  /// both rely on it).
   bool isLegalDiscard(GameCard candidate) {
     if (isGameOver) return false;
     // Card must be in current player's hand

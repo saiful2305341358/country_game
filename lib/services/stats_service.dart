@@ -151,17 +151,10 @@ class StatsService extends ChangeNotifier {
     return pct > 100.0 ? 100.0 : pct;
   }
 
-  List<int> get humanWinTimesSeconds {
-    if (_humanWinTimesSeconds.isNotEmpty) {
-      return List<int>.unmodifiable(_humanWinTimesSeconds);
-    }
-    final wins = humanWins;
-    if (wins > 0) {
-      final count = wins > 10 ? 10 : wins;
-      return List<int>.generate(count, (i) => 32 + ((i * 7) % 19));
-    }
-    return const <int>[];
-  }
+  /// Real, recorded win durations only (most recent last). Wins recorded before
+  /// timing was tracked have no duration and are not represented here.
+  List<int> get humanWinTimesSeconds =>
+      List<int>.unmodifiable(_humanWinTimesSeconds);
 
   int get averageWinTimeSeconds {
     final times = humanWinTimesSeconds;
@@ -261,12 +254,8 @@ class StatsService extends ChangeNotifier {
       lastRoundPoints: score.roundPoints,
       lastCompletedCountry: type,
     );
-    if (player.isHuman) {
-      final rawDuration = (durationSeconds != null && durationSeconds > 0)
-          ? durationSeconds
-          : (turnCount * totalPlayers * 0.85 + 8).round();
-      final clampedDuration = rawDuration.clamp(5, 600);
-      _humanWinTimesSeconds.add(clampedDuration);
+    if (player.isHuman && durationSeconds != null && durationSeconds > 0) {
+      _humanWinTimesSeconds.add(durationSeconds);
       if (_humanWinTimesSeconds.length > 12) {
         _humanWinTimesSeconds.removeRange(0, _humanWinTimesSeconds.length - 12);
       }

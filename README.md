@@ -1,17 +1,33 @@
-# country_game
+# Country Card Game
 
-A new Flutter project.
+An offline, landscape card-trading game for 3 to 7 players (you plus bots), built with Flutter.
 
-## Getting Started
+## Rules
 
-This project is a starting point for a Flutter application.
+- With **N** players there are N countries in play, N cards of each, plus one neutral **Global** card (N × N + 1 cards).
+- Every player starts with one card of each active country. The Global card starts on the table.
+- On your turn you take the face-up table card and put one card from your hand in its place.
+- **Same-type restriction:** you cannot put down a card of the same country as the card currently on the table. The Global card can always be played, and any card can be played onto it.
+- The first player to hold **N cards of one country** wins. The Global card never counts toward a set.
 
-A few resources to get you started if this is your first Flutter project:
+Bots only see their own hand. They deliberately release cards of the country you are collecting and occasionally pause their own collecting, which keeps the game approachable. See `lib/game/bot_strategy.dart`.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Running
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```sh
+flutter pub get
+flutter run          # Android / iOS / desktop
+flutter run -d chrome
+flutter test
+```
+
+## Project layout
+
+| Path | Contents |
+| --- | --- |
+| `lib/game/` | Rules engine: deck creation, initial deal, move validation, win detection, bot strategy |
+| `lib/models/` | Immutable game data (cards, players, game state, settings) |
+| `lib/services/` | Audio, haptics, stats and settings persistence (web: `localStorage`; mobile: native prefs over the `native_feedback` method channel in `MainActivity.kt` / `AppDelegate.swift`) |
+| `lib/screens/`, `lib/widgets/` | UI |
+| `test/` | Engine and widget tests |
+| `src/`, `index.html`, `package.json` | A separate React/Vite port of the same game (`npm install && npm run dev`) |

@@ -62,6 +62,19 @@ class PlayingTable extends StatefulWidget {
     this.animationsEnabled = true,
   });
 
+  /// Width and height of the fixed design stage that seats are laid out on.
+  static const Size stageSize = Size(
+    _PlayingTableState._stageWidth,
+    _PlayingTableState._stageHeight,
+  );
+
+  /// Avatar centre (in [stageSize] coordinates) of the opponent at
+  /// [playerIndex] (1..totalPlayers-1). Shared with the game screen so effects
+  /// such as the victory burst line up with the seats drawn here.
+  static Offset opponentSeatCenter(int playerIndex, int totalPlayers) =>
+      _PlayingTableState._getOpponentStageSeat(playerIndex - 1, totalPlayers)
+          .avatarPos;
+
   @override
   State<PlayingTable> createState() => _PlayingTableState();
 }
@@ -350,8 +363,11 @@ class _PlayingTableState extends State<PlayingTable>
   Offset _getTableSlotTopLeft(int slotIndex) =>
       slotIndex == 0 ? _leftTableSlotTopLeft : _rightTableSlotTopLeft;
 
-  /// Maps opponent index (0..totalPlayers-2) to its balanced stage seat for 3, 4, 5, or 6 players.
-  _StageSeatConfig _getOpponentStageSeat(int opponentIdx, int totalPlayers) {
+  /// Maps opponent index (0..totalPlayers-2) to its balanced stage seat for 3 to 7 players.
+  static _StageSeatConfig _getOpponentStageSeat(
+    int opponentIdx,
+    int totalPlayers,
+  ) {
     if (totalPlayers == 3) {
       // 2 bots: balanced Upper-Left and Upper-Right triangle seats
       return _twoOpponentSlots[opponentIdx % _twoOpponentSlots.length];

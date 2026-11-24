@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../game/game_engine.dart';
@@ -41,6 +42,7 @@ class _GameScreenState extends State<GameScreen>
   bool _showTutorialOverlay = false;
   bool _tutorialPausedEngine = false;
   bool _hasRecordedWinningSetForMatch = false;
+  bool _hasStartedFirstMatch = false;
   int _lastTurnCount = 0;
   final Stopwatch _matchStopwatch = Stopwatch();
 
@@ -93,6 +95,10 @@ class _GameScreenState extends State<GameScreen>
   }
 
   void _startMatch() {
+    // The countries previewed on the selection screen are used for the first
+    // match only; Play Again / Restart deal a fresh set (avoiding an immediate repeat).
+    final predefinedTypes = _hasStartedFirstMatch ? null : widget.predefinedTypes;
+    _hasStartedFirstMatch = true;
     final animateDeal = GameSettings.current.animationsEnabled;
     _lastTurnCount = 0;
     _showStatsOverlay = false;
@@ -105,7 +111,7 @@ class _GameScreenState extends State<GameScreen>
     _engine.updateSettings(GameSettings.current);
     _engine.startNewGame(
       totalPlayers: widget.totalPlayers,
-      predefinedTypes: widget.predefinedTypes,
+      predefinedTypes: predefinedTypes,
       deferBotStart: animateDeal || _showTutorialOverlay,
     );
 
@@ -155,6 +161,16 @@ class _GameScreenState extends State<GameScreen>
       }
     }
 
+    // Win time counts active play only (matches the web version): the clock
+    // stops while the game is paused, the tutorial/history is open, or dealing.
+    if (!_hasRecordedWinningSetForMatch) {
+      if (_engine.isPaused) {
+        _matchStopwatch.stop();
+      } else if (!_matchStopwatch.isRunning) {
+        _matchStopwatch.start();
+      }
+    }
+
     setState(() {});
   }
 
@@ -177,48 +193,11 @@ class _GameScreenState extends State<GameScreen>
     if (playerIndex == 0) {
       return const Offset(0.50, 0.76);
     }
-    final opponentIdx = playerIndex - 1;
-    if (totalPlayers == 3) {
-      const seats = [
-        Offset(450 / 1920, 380 / 1080),
-        Offset(1470 / 1920, 380 / 1080),
-      ];
-      return seats[opponentIdx % seats.length];
-    } else if (totalPlayers == 4) {
-      const seats = [
-        Offset(380 / 1920, 540 / 1080),
-        Offset(960 / 1920, 110 / 1080),
-        Offset(1540 / 1920, 540 / 1080),
-      ];
-      return seats[opponentIdx % seats.length];
-    } else if (totalPlayers == 5) {
-      const seats = [
-        Offset(401 / 1920, 762 / 1080),
-        Offset(548 / 1920, 313 / 1080),
-        Offset(1372 / 1920, 313 / 1080),
-        Offset(1519 / 1920, 762 / 1080),
-      ];
-      return seats[opponentIdx % seats.length];
-    } else if (totalPlayers == 7) {
-      const seats = [
-        Offset(340 / 1920, 760 / 1080),
-        Offset(430 / 1920, 430 / 1080),
-        Offset(730 / 1920, 155 / 1080),
-        Offset(1190 / 1920, 155 / 1080),
-        Offset(1490 / 1920, 430 / 1080),
-        Offset(1580 / 1920, 760 / 1080),
-      ];
-      return seats[opponentIdx % seats.length];
-    } else {
-      const seats = [
-        Offset(401 / 1920, 762 / 1080),
-        Offset(548 / 1920, 313 / 1080),
-        Offset(960 / 1920, 88 / 1080),
-        Offset(1372 / 1920, 313 / 1080),
-        Offset(1519 / 1920, 762 / 1080),
-      ];
-      return seats[opponentIdx % seats.length];
-    }
+    final seat = PlayingTable.opponentSeatCenter(playerIndex, totalPlayers);
+    return Offset(
+      seat.dx / PlayingTable.stageSize.width,
+      seat.dy / PlayingTable.stageSize.height,
+    );
   }
 
   void _triggerPostExchangeCues(
@@ -233,7 +212,7 @@ class _GameScreenState extends State<GameScreen>
       if (!_hasRecordedWinningSetForMatch) {
         _hasRecordedWinningSetForMatch = true;
         _matchStopwatch.stop();
-        final elapsedSec = _matchStopwatch.elapsed.inSeconds.clamp(5, 600);
+        final elapsedSec = math.max(1, _matchStopwatch.elapsed.inSeconds);
         StatsService.instance.recordSetCompleted(
           winner,
           winningType,

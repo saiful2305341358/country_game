@@ -106,7 +106,7 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
 
               // Reserve a deterministic, constant height for the country card stage based ONLY
               // on the viewport height (never on _selectedPlayers), so switching between
-              // 3, 4, 5, and 6 players NEVER causes any section or the START GAME button to shift.
+              // 3 to 7 players NEVER causes any section or the START GAME button to shift.
               final remainingForCards = availH - fixedSectionsTotal;
               final cardStageHeight = remainingForCards.clamp(96.0, 172.0);
               final totalLayoutHeight = fixedSectionsTotal + cardStageHeight;
@@ -133,7 +133,7 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
 
                           SizedBox(height: sectionGap),
 
-                          // 2. Anchored Player Count Selector Row (3, 4, 5, 6 Players)
+                          // 2. Anchored Player Count Selector Row (3 to 7 Players)
                           SizedBox(
                             height: selectorHeight,
                             child: Row(
@@ -418,7 +418,7 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
 
   /// Renders the active country cards in a single balanced horizontal row.
   /// Card dimensions are derived from the stage's fixed capacity for 6 cards so that
-  /// switching between 3, 4, 5, and 6 players keeps card sizes and proportions 100% identical.
+  /// switching between 3 and 7 players keeps card sizes and proportions 100% identical.
   Widget _buildCountryCardStage({required double stageHeight}) {
     return LayoutBuilder(
       builder: (context, stageConstraints) {

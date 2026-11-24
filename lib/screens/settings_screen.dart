@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/game_settings.dart';
 import '../services/audio_service.dart';
 import '../services/haptic_service.dart';
+import '../services/settings_store.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -26,11 +27,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _syncSettings() {
-    GameSettings.current = GameSettings.current.copyWith(
-      soundEnabled: _soundEnabled,
-      hapticsEnabled: _hapticsEnabled,
-      animationsEnabled: _animationsEnabled,
-      botDelayMs: _botDelayMs,
+    SettingsStore.save(
+      GameSettings.current.copyWith(
+        soundEnabled: _soundEnabled,
+        hapticsEnabled: _hapticsEnabled,
+        animationsEnabled: _animationsEnabled,
+        botDelayMs: _botDelayMs,
+      ),
     );
   }
 
@@ -38,10 +41,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _soundEnabled = true;
       _hapticsEnabled = true;
-      AudioService.instance.isSoundEnabled = true;
-      HapticService.instance.isHapticsEnabled = true;
       _animationsEnabled = true;
-      _botDelayMs = 1650;
+      _botDelayMs = SettingsStore.normalBotDelayMs;
       _syncSettings();
     });
     AudioService.instance.playButtonClick();
@@ -206,7 +207,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                           ),
                                         ),
                                         subtitle: const Text(
-                                          'Physical vibration responses for card taps, turn alerts, and victory events',
+                                          'Vibration when a match ends (stronger when you win)',
                                           style: TextStyle(
                                             color: Colors.white60,
                                             fontSize: 10,
@@ -230,7 +231,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                             _syncSettings();
                                           });
                                           if (val) {
-                                            HapticService.instance.cardPass();
+                                            // Preview the pulse players will feel at the end of a match
+                                            HapticService.instance.roundEnd();
                                           }
                                         },
                                       ),
@@ -314,11 +316,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                                 ),
                                               ),
                                               Text(
-                                                _botDelayMs <= 1100
-                                                    ? 'Fast (1100ms)'
-                                                    : _botDelayMs <= 1650
-                                                        ? 'Normal (1650ms)'
-                                                        : 'Relaxed (2300ms)',
+                                                _botDelayMs <=
+                                                        SettingsStore
+                                                            .fastBotDelayMs
+                                                    ? 'Fast'
+                                                    : _botDelayMs <=
+                                                            SettingsStore
+                                                                .normalBotDelayMs
+                                                        ? 'Normal'
+                                                        : 'Relaxed',
                                                 style: const TextStyle(
                                                   color: Color(0xFFFFD54F),
                                                   fontSize: 10.5,
@@ -332,11 +338,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     const SizedBox(height: 8),
                                     Row(
                                       children: [
-                                        _buildPaceButton('Fast', 1100),
+                                        _buildPaceButton('Fast', SettingsStore.fastBotDelayMs),
                                         const SizedBox(width: 8),
-                                        _buildPaceButton('Normal', 1650),
+                                        _buildPaceButton('Normal', SettingsStore.normalBotDelayMs),
                                         const SizedBox(width: 8),
-                                        _buildPaceButton('Relaxed', 2300),
+                                        _buildPaceButton('Relaxed', SettingsStore.relaxedBotDelayMs),
                                       ],
                                     ),
                                   ],
