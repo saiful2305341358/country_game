@@ -31,8 +31,12 @@ void main() {
     );
     expect(find.text('PLAY OFFLINE'), findsOneWidget);
     expect(find.text('PLAY WITH FRIENDS'), findsOneWidget);
-    expect(find.text('ONLINE MULTIPLAYER'), findsOneWidget);
-    expect(find.text('COMING SOON'), findsOneWidget);
+    // Hidden for store builds until online multiplayer exists.
+    final onlineTile = MainMenuScreen.showOnlineMultiplayer
+        ? findsOneWidget
+        : findsNothing;
+    expect(find.text('ONLINE MULTIPLAYER'), onlineTile);
+    expect(find.text('COMING SOON'), onlineTile);
     expect(find.text('SETTINGS'), findsOneWidget);
     expect(find.text('RULES'), findsOneWidget);
     expect(find.text('STATS'), findsOneWidget);
@@ -46,7 +50,7 @@ void main() {
     await tester.pump();
     expect(find.textContaining('Online multiplayer is coming soon'), findsOneWidget);
     expect(find.byType(MainMenuScreen), findsOneWidget);
-  });
+  }, skip: !MainMenuScreen.showOnlineMultiplayer);
 
   testWidgets('Play with Friends offers Internet and Nearby (Wi-Fi / hotspot) options', (WidgetTester tester) async {
     await tester.pumpWidget(CountryGameApp(key: UniqueKey(), showIntroOnStart: false));

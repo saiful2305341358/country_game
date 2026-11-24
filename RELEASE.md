@@ -23,7 +23,7 @@ Format: `- [ ] Short title — what and why`
 
 ### Multiplayer readiness
 - [ ] **Hide other players' cards** from network data (already in backlog.md). A store reviewer will not notice, but players could cheat.
-- [ ] **"Online Multiplayer — COMING SOON" on the home screen.** Apple often rejects apps that show unfinished features (guideline 2.1). Hide the button for the store build, or finish the feature first.
+- [x] **"Online Multiplayer — COMING SOON" on the home screen.** Apple often rejects apps that show unfinished features (guideline 2.1). Hidden: set `MainMenuScreen.showOnlineMultiplayer` to `true` in `lib/screens/main_menu_screen.dart` to show it again once the feature exists.
 - [ ] **Supabase free plan pauses a project after about 1 week without use.** While it is paused, Internet rooms fail. Before launch, either upgrade to a paid plan or make sure the project is used regularly. Also check the free-plan limits (Realtime connections, database size).
 - [ ] **Supabase abuse protection.** Anyone can sign in anonymously. In the Supabase dashboard, turn on CAPTCHA for anonymous sign-ins (Authentication → Attack Protection) or keep the rate limits low.
 - [ ] **Clean up old rooms.** Add a scheduled job (Supabase `pg_cron`) that deletes rooms and moves older than one day, so the database does not keep growing.

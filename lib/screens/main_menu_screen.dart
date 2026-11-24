@@ -11,6 +11,11 @@ import 'settings_screen.dart';
 class MainMenuScreen extends StatelessWidget {
   const MainMenuScreen({super.key});
 
+  /// The "Online multiplayer" tile is not built yet. App Store review rejects
+  /// placeholder features, so it stays hidden until it works; set to true to
+  /// show it again (with its "Coming soon" badge).
+  static const bool showOnlineMultiplayer = false;
+
   void _click() {
     AudioService.instance.playButtonClick();
     HapticService.instance.uiTap();
@@ -149,22 +154,23 @@ class MainMenuScreen extends StatelessWidget {
                 );
               },
             ),
-            ModeCard(
-              icon: Icons.public_rounded,
-              title: 'ONLINE MULTIPLAYER',
-              subtitle: 'Play with anyone',
-              badge: 'COMING SOON',
-              dimmed: true,
-              compact: isCompactH,
-              onTap: () {
-                _click();
-                showMenuNotice(
-                  context,
-                  'Online multiplayer is coming soon. '
-                  'Meanwhile, try Play with Friends!',
-                );
-              },
-            ),
+            if (showOnlineMultiplayer)
+              ModeCard(
+                icon: Icons.public_rounded,
+                title: 'ONLINE MULTIPLAYER',
+                subtitle: 'Play with anyone',
+                badge: 'COMING SOON',
+                dimmed: true,
+                compact: isCompactH,
+                onTap: () {
+                  _click();
+                  showMenuNotice(
+                    context,
+                    'Online multiplayer is coming soon. '
+                    'Meanwhile, try Play with Friends!',
+                  );
+                },
+              ),
           ],
         ),
         SizedBox(height: isCompactH ? 12 : 16),
