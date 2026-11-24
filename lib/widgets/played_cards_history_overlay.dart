@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../models/card_type.dart';
 import '../models/game_state.dart';
 import '../services/audio_service.dart';
 import '../services/haptic_service.dart';
