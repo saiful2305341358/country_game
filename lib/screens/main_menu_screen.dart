@@ -2,12 +2,19 @@ import 'package:material_ui/material_ui.dart';
 import '../services/audio_service.dart';
 import '../services/haptic_service.dart';
 import '../widgets/game_logo.dart';
+import '../widgets/mode_card.dart';
 import '../widgets/player_stats_overlay.dart';
+import 'play_with_friends_screen.dart';
 import 'player_selection_screen.dart';
 import 'settings_screen.dart';
 
 class MainMenuScreen extends StatelessWidget {
   const MainMenuScreen({super.key});
+
+  void _click() {
+    AudioService.instance.playButtonClick();
+    HapticService.instance.uiTap();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,17 +22,7 @@ class MainMenuScreen extends StatelessWidget {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment.center,
-            radius: 1.2,
-            colors: [
-              Color(0xFF0F3B2C),
-              Color(0xFF09251B),
-              Color(0xFF03140E),
-            ],
-          ),
-        ),
+        decoration: menuBackgroundDecoration,
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -40,237 +37,20 @@ class MainMenuScreen extends StatelessWidget {
                     vertical: isCompactH ? 10 : 16,
                   ),
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 820),
+                    constraints: const BoxConstraints(maxWidth: 880),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Left Column: Brand Crest, Game Title, Dynamic Tagline & Offline Badge
+                        // Left: brand crest, title and tagline (unchanged identity)
                         Expanded(
-                          flex: 11,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _buildAppLogo(size: isCompactH ? 82 : 96),
-                              SizedBox(height: isCompactH ? 12 : 16),
-                              Text(
-                                'COUNTRY GAME',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: const Color(0xFFFFD700),
-                                  fontSize: isCompactH ? 24 : 28,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 3,
-                                  shadows: const [
-                                    Shadow(
-                                      color: Colors.black87,
-                                      blurRadius: 10,
-                                      offset: Offset(0, 3),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              const Text(
-                                'Unite the Nations: Collect all cards of a country to conquer the round!',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Color(0xFFFFE082),
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w500,
-                                  height: 1.35,
-                                  letterSpacing: 0.4,
-                                ),
-                              ),
-                              SizedBox(height: isCompactH ? 12 : 16),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.offline_pin,
-                                    color: Color(0xFF10B981),
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Flexible(
-                                    child: Text(
-                                      '100% Offline • No Network Required',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color:
-                                            Colors.white.withValues(alpha: 0.6),
-                                        fontSize: 11,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                          flex: 9,
+                          child: _buildBrand(isCompactH: isCompactH),
                         ),
-
-                        SizedBox(width: availW < 680 ? 24 : 36),
-
-                        // Right Column: Primary Navigation & Overlays
+                        SizedBox(width: availW < 680 ? 20 : 36),
+                        // Right: game modes + secondary actions
                         Expanded(
-                          flex: 10,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              // Play Button
-                              ElevatedButton.icon(
-                                icon: Icon(
-                                  Icons.play_circle_fill,
-                                  size: isCompactH ? 22 : 26,
-                                ),
-                                label: Text(
-                                  'PLAY GAME',
-                                  style: TextStyle(
-                                    fontSize: isCompactH ? 14.5 : 16,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 1.5,
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFD97706),
-                                  foregroundColor: Colors.white,
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: isCompactH ? 12 : 14,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  elevation: 6,
-                                  shadowColor: const Color(0xFFD97706)
-                                      .withValues(alpha: 0.5),
-                                ),
-                                onPressed: () {
-                                  AudioService.instance.playButtonClick();
-                                  HapticService.instance.uiTap();
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          const PlayerSelectionScreen(),
-                                    ),
-                                  );
-                                },
-                              ),
-
-                              SizedBox(height: isCompactH ? 8 : 10),
-
-                              // Bilingual How to Play & Rules Button
-                              OutlinedButton.icon(
-                                icon: const Icon(Icons.help_outline, size: 19),
-                                label: const Text(
-                                  'HOW TO PLAY & RULES',
-                                  style: TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1,
-                                  ),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFFFFE082),
-                                  side: const BorderSide(
-                                    color: Color(0xFFD4AF37),
-                                    width: 1.2,
-                                  ),
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: isCompactH ? 11 : 13,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                onPressed: () {
-                                  AudioService.instance.playButtonClick();
-                                  HapticService.instance.uiTap();
-                                  _showRulesDialog(context);
-                                },
-                              ),
-
-                              SizedBox(height: isCompactH ? 10 : 12),
-
-                              // Settings Button
-                              OutlinedButton.icon(
-                                icon: const Icon(Icons.settings, size: 19),
-                                label: const Text(
-                                  'SETTINGS',
-                                  style: TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1,
-                                  ),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.white70,
-                                  side: const BorderSide(
-                                    color: Colors.white24,
-                                    width: 1.0,
-                                  ),
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: isCompactH ? 10 : 12,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                onPressed: () {
-                                  AudioService.instance.playButtonClick();
-                                  HapticService.instance.uiTap();
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => const SettingsScreen(),
-                                    ),
-                                  );
-                                },
-                              ),
-
-                              SizedBox(height: isCompactH ? 8 : 10),
-
-                              // Player Stats & Sets Overlay Button
-                              TextButton.icon(
-                                icon: const Icon(
-                                  Icons.leaderboard_rounded,
-                                  size: 19,
-                                  color: Color(0xFFFFD54F),
-                                ),
-                                label: const Text(
-                                  'PLAYER STATS & SETS',
-                                  style: TextStyle(
-                                    color: Color(0xFFFFE082),
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1,
-                                  ),
-                                ),
-                                style: TextButton.styleFrom(
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: isCompactH ? 8 : 10,
-                                  ),
-                                ),
-                                onPressed: () {
-                                  AudioService.instance.playButtonClick();
-                                  HapticService.instance.uiTap();
-                                  showDialog(
-                                    context: context,
-                                    builder: (dialogContext) => Dialog(
-                                      backgroundColor: Colors.transparent,
-                                      insetPadding: EdgeInsets.zero,
-                                      child: PlayerStatsOverlay(
-                                        onClose: () =>
-                                            Navigator.pop(dialogContext),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
+                          flex: 12,
+                          child: _buildMenu(context, isCompactH: isCompactH),
                         ),
                       ],
                     ),
@@ -284,14 +64,162 @@ class MainMenuScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAppLogo({double size = 96}) {
-    return GameLogo(size: size, withGlow: true);
+  Widget _buildBrand({required bool isCompactH}) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GameLogo(size: isCompactH ? 82 : 96, withGlow: true),
+        SizedBox(height: isCompactH ? 12 : 16),
+        Text(
+          'COUNTRY GAME',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: MenuColors.gold,
+            fontSize: isCompactH ? 24 : 28,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 3,
+            shadows: const [
+              Shadow(
+                color: Colors.black87,
+                blurRadius: 10,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Unite the Nations: Collect all cards of a country to conquer the round!',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: MenuColors.goldText,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w500,
+            height: 1.35,
+            letterSpacing: 0.4,
+          ),
+        ),
+      ],
+    );
   }
 
-  void _showRulesDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => const BilingualRulesDialog(),
+  Widget _buildMenu(BuildContext context, {required bool isCompactH}) {
+    final tileHeight = isCompactH ? 118.0 : 140.0;
+    final gap = isCompactH ? 8.0 : 12.0;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Leaves room above the tiles for their corner badges.
+        const SizedBox(height: 8),
+        ModeCardRow(
+          minHeight: tileHeight,
+          gap: gap,
+          children: [
+            ModeCard(
+              icon: Icons.play_arrow_rounded,
+              title: 'PLAY OFFLINE',
+              subtitle: 'You vs bots',
+              primary: true,
+              compact: isCompactH,
+              onTap: () {
+                _click();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const PlayerSelectionScreen(),
+                  ),
+                );
+              },
+            ),
+            ModeCard(
+              icon: Icons.groups_rounded,
+              title: 'PLAY WITH FRIENDS',
+              subtitle: 'Internet or nearby',
+              accent: MenuColors.emerald,
+              compact: isCompactH,
+              onTap: () {
+                _click();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const PlayWithFriendsScreen(),
+                  ),
+                );
+              },
+            ),
+            ModeCard(
+              icon: Icons.public_rounded,
+              title: 'ONLINE MULTIPLAYER',
+              subtitle: 'Play with anyone',
+              badge: 'COMING SOON',
+              dimmed: true,
+              compact: isCompactH,
+              onTap: () {
+                _click();
+                showMenuNotice(
+                  context,
+                  'Online multiplayer is coming soon. '
+                  'Meanwhile, try Play with Friends!',
+                );
+              },
+            ),
+          ],
+        ),
+        SizedBox(height: isCompactH ? 12 : 16),
+        Row(
+          children: [
+            Expanded(
+              child: MenuUtilityButton(
+                icon: Icons.help_outline_rounded,
+                label: 'RULES',
+                onPressed: () {
+                  _click();
+                  showDialog(
+                    context: context,
+                    builder: (_) => const BilingualRulesDialog(),
+                  );
+                },
+              ),
+            ),
+            SizedBox(width: gap),
+            Expanded(
+              child: MenuUtilityButton(
+                icon: Icons.settings_rounded,
+                label: 'SETTINGS',
+                onPressed: () {
+                  _click();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                },
+              ),
+            ),
+            SizedBox(width: gap),
+            Expanded(
+              child: MenuUtilityButton(
+                icon: Icons.leaderboard_rounded,
+                label: 'STATS',
+                onPressed: () {
+                  _click();
+                  showDialog(
+                    context: context,
+                    builder: (dialogContext) => Dialog(
+                      backgroundColor: Colors.transparent,
+                      insetPadding: EdgeInsets.zero,
+                      child: PlayerStatsOverlay(
+                        onClose: () => Navigator.pop(dialogContext),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -346,7 +274,9 @@ class _BilingualRulesDialogState extends State<BilingualRulesDialog> {
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
-                            _isBangla ? 'খেলার নিয়মাবলী' : 'How to Play & Rules',
+                            _isBangla
+                                ? 'খেলার নিয়মাবলী'
+                                : 'How to Play & Rules',
                             style: TextStyle(
                               color: const Color(0xFFFFD54F),
                               fontSize: isCompactH ? 16 : 18,
@@ -394,9 +324,7 @@ class _BilingualRulesDialogState extends State<BilingualRulesDialog> {
               // Rules Body
               Flexible(
                 child: SingleChildScrollView(
-                  child: _isBangla
-                      ? _buildBanglaRules()
-                      : _buildEnglishRules(),
+                  child: _isBangla ? _buildBanglaRules() : _buildEnglishRules(),
                 ),
               ),
 

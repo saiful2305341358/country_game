@@ -2,6 +2,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:country_game/main.dart';
 import 'package:country_game/screens/intro_video_screen.dart';
+import 'package:country_game/screens/main_menu_screen.dart';
+import 'package:country_game/screens/play_with_friends_screen.dart';
 import 'package:country_game/screens/player_selection_screen.dart';
 import 'package:country_game/widgets/card_dimensions.dart';
 import 'package:country_game/models/card_type.dart';
@@ -26,16 +28,71 @@ void main() {
       find.text('Unite the Nations: Collect all cards of a country to conquer the round!'),
       findsOneWidget,
     );
-    expect(find.text('PLAY GAME'), findsOneWidget);
+    expect(find.text('PLAY OFFLINE'), findsOneWidget);
+    expect(find.text('PLAY WITH FRIENDS'), findsOneWidget);
+    expect(find.text('ONLINE MULTIPLAYER'), findsOneWidget);
+    expect(find.text('COMING SOON'), findsOneWidget);
     expect(find.text('SETTINGS'), findsOneWidget);
-    expect(find.text('HOW TO PLAY & RULES'), findsOneWidget);
+    expect(find.text('RULES'), findsOneWidget);
+    expect(find.text('STATS'), findsOneWidget);
+  });
+
+  testWidgets('Online Multiplayer tile explains it is coming soon', (WidgetTester tester) async {
+    await tester.pumpWidget(CountryGameApp(key: UniqueKey(), showIntroOnStart: false));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('ONLINE MULTIPLAYER'));
+    await tester.pump();
+    expect(find.textContaining('Online multiplayer is coming soon'), findsOneWidget);
+    expect(find.byType(MainMenuScreen), findsOneWidget);
+  });
+
+  testWidgets('Play with Friends offers Internet and Nearby (Wi-Fi / hotspot) options', (WidgetTester tester) async {
+    await tester.pumpWidget(CountryGameApp(key: UniqueKey(), showIntroOnStart: false));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('PLAY WITH FRIENDS'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PlayWithFriendsScreen), findsOneWidget);
+    expect(find.text('Play with Friends'), findsOneWidget);
+    expect(find.text('PLAY VIA INTERNET'), findsOneWidget);
+    expect(find.text('PLAY NEARBY'), findsOneWidget);
+
+    await tester.tap(find.text('PLAY VIA INTERNET'));
+    await tester.pump();
+    expect(find.textContaining('Internet rooms are coming'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(find.byType(MainMenuScreen), findsOneWidget);
+  });
+
+  testWidgets('Home and Play with Friends screens lay out without overflow on small and portrait viewports', (WidgetTester tester) async {
+    for (final viewport in const [
+      Size(568, 320),
+      Size(640, 360),
+      Size(844, 390),
+      Size(1280, 720),
+      Size(390, 844), // portrait host, rotated to landscape by the app
+    ]) {
+      await tester.binding.setSurfaceSize(viewport);
+      await tester.pumpWidget(CountryGameApp(key: UniqueKey(), showIntroOnStart: false));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: 'home at $viewport');
+
+      await tester.tap(find.text('PLAY WITH FRIENDS'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: 'friends at $viewport');
+    }
+    await tester.binding.setSurfaceSize(null);
   });
 
   testWidgets('Bilingual Rules dialog toggles between English and Bangla with updated copy', (WidgetTester tester) async {
     await tester.pumpWidget(const CountryGameApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('HOW TO PLAY & RULES'));
+    await tester.tap(find.text('RULES'));
     await tester.pumpAndSettle();
 
     // Default English rules
@@ -67,7 +124,7 @@ void main() {
     await tester.pumpWidget(const CountryGameApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('PLAY GAME'));
+    await tester.tap(find.text('PLAY OFFLINE'));
     await tester.pumpAndSettle();
 
     expect(find.byType(PlayerSelectionScreen), findsOneWidget);
@@ -92,7 +149,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('PLAY GAME'));
+      await tester.tap(find.text('PLAY OFFLINE'));
       await tester.pumpAndSettle();
 
       // Measure anchored positions in 4-player mode
@@ -168,10 +225,10 @@ void main() {
 
     // Main Menu is rendered in landscape via LandscapeViewportWrapper
     expect(find.byType(RotatedBox), findsWidgets);
-    expect(find.text('PLAY GAME'), findsOneWidget);
+    expect(find.text('PLAY OFFLINE'), findsOneWidget);
 
     // Navigate to Player Selection Screen and verify it remains in landscape
-    await tester.tap(find.text('PLAY GAME'));
+    await tester.tap(find.text('PLAY OFFLINE'));
     await tester.pumpAndSettle();
     expect(find.byType(PlayerSelectionScreen), findsOneWidget);
     expect(find.text('START GAME'), findsOneWidget);
@@ -266,7 +323,7 @@ void main() {
     await tester.pumpWidget(const CountryGameApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('PLAY GAME'));
+    await tester.tap(find.text('PLAY OFFLINE'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('START GAME'));
@@ -340,7 +397,7 @@ void main() {
     await tester.pumpWidget(const CountryGameApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('PLAY GAME'));
+    await tester.tap(find.text('PLAY OFFLINE'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('START GAME'));
@@ -474,6 +531,6 @@ void main() {
     // Finish the intro and verify transition to MainMenuScreen
     await tester.pumpAndSettle();
     expect(find.byType(IntroVideoScreen), findsNothing);
-    expect(find.text('PLAY GAME'), findsOneWidget);
+    expect(find.text('PLAY OFFLINE'), findsOneWidget);
   });
 }

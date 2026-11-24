@@ -11,19 +11,20 @@ Format: `- [ ] Short title — what and why (optional notes)`
 ## Planned
 
 - [ ] **Multiplayer: play with friends via Internet and nearby Wi-Fi / hotspot** — real human opponents instead of bots, with the same rules, cards and table as offline play. Source: feature request plus the `game_screens.drawio.xml` diagram. Nearby play uses Wi-Fi / hotspot instead of Bluetooth (decided: it works with Android and iPhone together, handles all 7 players reliably, and shares its code with Internet play).
-  - [ ] **Home screen redesign**: three options, **Play Offline** (the current game, unchanged), **Play with Friends**, and **Play Online Multiplayer** (shown as "Coming soon"). Keep the current background colour and visual identity; clean, modern, minimal.
-  - [ ] **Play with Friends screen**: choose **Play via Internet** or **Play nearby (Wi-Fi / Hotspot)**.
-  - [ ] **Internet, Create Room**: auto-generate a unique 3-digit room code, choose the number of players, show the code for the host to share, and set up the online session.
-  - [ ] **Internet, Join Room**: a text field for the code; validate it, then join if the room exists and has a free seat.
-  - [ ] **Nearby, Create / Join Room**: the same flow as Internet (per the diagram). The host phone runs the game server on the local network (its own hotspot or a shared Wi-Fi); the other players connect to it. Rooms use a 3-digit code, and rooms on the network are also discovered automatically. No internet data is used. Show a short hint on how to turn on and join a hotspot.
+  - [x] **Stage 1: Home screen redesign**: three options, **Play Offline** (the current game, unchanged), **Play with Friends**, and **Play Online Multiplayer** (shown as "Coming soon"). Keep the existing logo, card design, visual identity and background colour; layout, buttons and navigation may be redesigned (clean, modern, minimal), following the diagram.
+  - [x] **Stage 1: Play with Friends screen**: choose **Play via Internet** or **Play nearby (Wi-Fi / Hotspot)**.
+  - [ ] **Stage 2: Internet rooms (Supabase)**
+    - Create Room: auto-generate a unique 3-digit room code and show it for the host to share.
+    - Join Room: a text field for the code; validate it, then join if the room exists.
+  - [ ] **Stage 3: Nearby rooms (Wi-Fi / hotspot)**: the same flow as Internet. The host phone runs the game server on the local network (its own hotspot or a shared Wi-Fi); the other players connect to it. Rooms use a 3-digit code, and rooms on the network are also discovered automatically. No internet data is used. Show a short hint on how to turn on and join a hotspot.
   - [ ] **Synchronized gameplay**: reuse the existing engine, cards and table. Every device sees the same moves and turn order, and moves are only accepted from the player whose turn it is.
-  - [ ] **Session handling**: lobby and ready state, start game, disconnect and leave handling, errors (wrong code, full room, lost connection), and clean-up of finished rooms.
   - [ ] Offline play must keep working exactly as now, with no regressions.
-  - Open questions to settle before starting:
-    1. Internet backend: Firebase, Supabase, or a self-hosted server? Each needs a project or hosting that you set up.
-    2. ~~Bluetooth platforms~~ — settled: nearby play uses Wi-Fi / hotspot, so Android and iPhone can play together.
-    3. "Striker visual concept": this game has no striker. Which element is meant (the logo, the card style)?
-    4. Rooms with fewer friends than the chosen player count: fill the empty seats with bots, or wait until the room is full?
+  - Room rules (decided, apply to Internet and Nearby):
+    - No bots: every seat is a real player.
+    - No fixed player count: a round can start once at least 3 players are in the room (the game supports up to 7). Each round is dealt for the players present (N players → N-card winning set).
+    - A player who joins during a round appears to everyone as a join request and is dealt in from the next round.
+    - The room stays open across rounds; the room creator decides how many rounds to play and when to close the room. The code is freed when the room closes.
+    - Handle disconnects, leaving, wrong codes and lost connections.
 
 ## In progress
 
