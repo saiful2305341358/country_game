@@ -9,6 +9,7 @@ import '../online/host_referee.dart';
 import '../online/room_session.dart';
 import '../services/audio_service.dart';
 import '../services/haptic_service.dart';
+import '../services/screen_awake.dart';
 import '../widgets/game_logo.dart';
 import '../widgets/mode_card.dart';
 import '../widgets/played_cards_history_overlay.dart';
@@ -47,10 +48,13 @@ class _OnlineRoomScreenState extends State<OnlineRoomScreen> {
     _lastStatus = _room.status;
     _room.addListener(_onRoomChanged);
     if (_room.status == RoomStatus.roundOver) _showRoundOver = true;
+    // The host's phone is the referee: if it locks, the room stops.
+    ScreenAwake.set(true);
   }
 
   @override
   void dispose() {
+    ScreenAwake.set(false);
     _roundOverTimer?.cancel();
     _room.removeListener(_onRoomChanged);
     _room.dispose();

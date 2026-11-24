@@ -108,6 +108,11 @@ import UIKit
           }
         }
         result(nil)
+      case "keepScreenOn":
+        let args = call.arguments as? [String: Any]
+        let on = (args?["on"] as? Bool) ?? false
+        UIApplication.shared.isIdleTimerDisabled = on
+        result(nil)
       default:
         result(FlutterMethodNotImplemented)
       }

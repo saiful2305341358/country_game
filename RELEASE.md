@@ -96,7 +96,7 @@ Format: `- [ ] Short title — what and why`
 - [x] **Export compliance:** add `ITSAppUsesNonExemptEncryption` = `false` to `Info.plist`. The app only uses standard HTTPS/TLS, which is exempt, so Apple stops asking on every upload.
 - [ ] **Local Network permission:** the text is already in `Info.plist` (`NSLocalNetworkUsageDescription`). Test that the first nearby join after tapping "Allow" works. The very first attempt can fail while the permission popup is open; consider retrying once automatically.
 - [ ] **Multicast entitlement (optional):** needed only for the automatic "rooms nearby" list on iPhone. Request `com.apple.developer.networking.multicast` from Apple (developer.apple.com/contact/request/networking-multicast), then add it to the app's entitlements. Without it, iPhones join by code.
-- [ ] **Hosting from an iPhone:** the room stops if the host locks the phone or switches apps (iOS suspends background apps). Show a hint to the host ("keep the app open"), or keep the screen awake while hosting (`wakelock_plus` package).
+- [x] **Hosting from an iPhone:** the room stops if the host locks the phone or switches apps (iOS suspends background apps). Done: the screen stays awake while any room is open (`ScreenAwake` in `lib/services/screen_awake.dart`, method `keepScreenOn`), for the host and for players. Still open: switching to another app suspends the room; consider a short "keep the app open" hint for the host. Not yet tested on a real iPhone.
 - [ ] **Build:** `flutter build ipa --release`. The first run creates `ios/Podfile` and installs pods. Upload with Xcode (Product → Archive → Distribute) or the Transporter app. The deployment target is iOS 15.0.
 
 ### App Store Connect

@@ -246,6 +246,17 @@ class MainActivity : FlutterActivity() {
                         }
                         result.success(null)
                     }
+                    "keepScreenOn" -> {
+                        val on = call.argument<Boolean>("on") ?: false
+                        try {
+                            if (on) {
+                                window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                            } else {
+                                window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                            }
+                        } catch (_: Throwable) {}
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }
