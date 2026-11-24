@@ -13,12 +13,15 @@ Format: `- [ ] Short title — what and why (optional notes)`
 - [ ] **Multiplayer: play with friends via Internet and nearby Wi-Fi / hotspot** — real human opponents instead of bots, with the same rules, cards and table as offline play. Source: feature request plus the `game_screens.drawio.xml` diagram. Nearby play uses Wi-Fi / hotspot instead of Bluetooth (decided: it works with Android and iPhone together, handles all 7 players reliably, and shares its code with Internet play).
   - [x] **Stage 1: Home screen redesign**: three options, **Play Offline** (the current game, unchanged), **Play with Friends**, and **Play Online Multiplayer** (shown as "Coming soon"). Keep the existing logo, card design, visual identity and background colour; layout, buttons and navigation may be redesigned (clean, modern, minimal), following the diagram.
   - [x] **Stage 1: Play with Friends screen**: choose **Play via Internet** or **Play nearby (Wi-Fi / Hotspot)**.
-  - [ ] **Stage 2: Internet rooms (Supabase)**
+  - [x] **Stage 2: Internet rooms (Supabase)**
     - Create Room: auto-generate a unique 3-digit room code and show it for the host to share.
     - Join Room: a text field for the code; validate it, then join if the room exists.
   - [ ] **Stage 3: Nearby rooms (Wi-Fi / hotspot)**: the same flow as Internet. The host phone runs the game server on the local network (its own hotspot or a shared Wi-Fi); the other players connect to it. Rooms use a 3-digit code, and rooms on the network are also discovered automatically. No internet data is used. Show a short hint on how to turn on and join a hotspot.
   - [ ] **Synchronized gameplay**: reuse the existing engine, cards and table. Every device sees the same moves and turn order, and moves are only accepted from the player whose turn it is.
   - [ ] Offline play must keep working exactly as now, with no regressions.
+  - [ ] Hide other players' cards from the shared room data. Today every phone receives the whole round (the app only shows your own hand), so a technical player could read other hands from network traffic. Fix: send each player only their own hand.
+  - [ ] Online rounds are not recorded in Player Stats (to keep the offline leaderboard clean); decide whether to track online wins separately.
+  - [ ] Show when a player's connection drops (today the host can stop the round from the ⚙ menu).
   - Room rules (decided, apply to Internet and Nearby):
     - No bots: every seat is a real player.
     - No fixed player count: a round can start once at least 3 players are in the room (the game supports up to 7). Each round is dealt for the players present (N players → N-card winning set).

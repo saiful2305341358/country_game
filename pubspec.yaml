@@ -37,6 +37,7 @@ dependencies:
 
   # Material widgets (replaces the deprecated package:flutter/material.dart).
   material_ui: ^1.11.1
+  supabase_flutter: ^2.18.3
 
 dev_dependencies:
   flutter_test:

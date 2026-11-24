@@ -51,6 +51,7 @@ class GameEngine extends ChangeNotifier {
     int? totalPlayers,
     int? randomSeed,
     List<CountryType>? predefinedTypes,
+    List<String>? playerNames,
     bool deferBotStart = false,
   }) {
     _cancelBotAction(clearRemaining: true);
@@ -79,6 +80,7 @@ class GameEngine extends ChangeNotifier {
       activeTypes: deckResult.activeTypes,
       initialDeckByType: deckResult.ordinaryCardsByType,
       random: rng,
+      playerNames: playerNames,
     );
 
     // 3. Random starting player
@@ -428,6 +430,18 @@ class GameEngine extends ChangeNotifier {
     }
 
     return true;
+  }
+
+  /// Replaces the current game with [state] (e.g. a round received from the
+  /// network) so the next [makeMove] continues from it. No bot is scheduled.
+  void loadState(GameState state) {
+    _cancelBotAction(clearRemaining: true);
+    _gameSessionId++;
+    _isProcessingMove = false;
+    _isExchangeAnimating = false;
+    _state = state;
+    assert(verifyIntegrity());
+    notifyListeners();
   }
 
   void resetCurrentGame({bool deferBotStart = false}) {

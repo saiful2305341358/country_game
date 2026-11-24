@@ -3,6 +3,7 @@ import '../services/audio_service.dart';
 import '../services/haptic_service.dart';
 import '../widgets/game_logo.dart';
 import '../widgets/mode_card.dart';
+import 'internet_rooms_screen.dart';
 
 /// Lets the player choose how to connect with friends: over the Internet or
 /// on the same Wi-Fi / hotspot. Every seat is a real player (no bots); a round
@@ -52,13 +53,14 @@ class PlayWithFriendsScreen extends StatelessWidget {
                               subtitle:
                                   'Friends anywhere · create or join a room with a 3-digit code',
                               accent: MenuColors.goldBorder,
-                              badge: 'COMING SOON',
                               compact: isCompactH,
                               onTap: () {
                                 _click();
-                                showMenuNotice(
+                                Navigator.push(
                                   context,
-                                  'Internet rooms are coming in the next update.',
+                                  MaterialPageRoute(
+                                    builder: (_) => const InternetRoomsScreen(),
+                                  ),
                                 );
                               },
                             ),

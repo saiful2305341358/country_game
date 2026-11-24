@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:country_game/main.dart';
+import 'package:country_game/screens/internet_rooms_screen.dart';
 import 'package:country_game/screens/intro_video_screen.dart';
 import 'package:country_game/screens/main_menu_screen.dart';
 import 'package:country_game/screens/play_with_friends_screen.dart';
@@ -60,8 +61,20 @@ void main() {
     expect(find.text('PLAY NEARBY'), findsOneWidget);
 
     await tester.tap(find.text('PLAY VIA INTERNET'));
+    await tester.pumpAndSettle();
+    expect(find.byType(InternetRoomsScreen), findsOneWidget);
+    expect(find.text('CREATE ROOM'), findsOneWidget);
+    expect(find.text('JOIN ROOM'), findsOneWidget);
+
+    // Creating a room needs a name first (no network call is made).
+    await tester.tap(find.text('CREATE ROOM'));
     await tester.pump();
-    expect(find.textContaining('Internet rooms are coming'), findsOneWidget);
+    expect(find.text('Please enter your name first.'), findsOneWidget);
+    await tester.pumpAndSettle(const Duration(seconds: 3));
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PlayWithFriendsScreen), findsOneWidget);
 
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();

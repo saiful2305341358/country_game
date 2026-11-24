@@ -27,13 +27,22 @@ class InitialExchangeService {
   ];
 
   /// Executes the logically simultaneous initial card exchange.
+  ///
+  /// With [playerNames] (one per seat), every player is a real human with that
+  /// name (multiplayer). Otherwise seat 0 is "You" and the rest are named bots.
   static List<GamePlayer> performInitialExchange({
     required List<CountryType> activeTypes,
     required Map<CountryType, List<GameCard>> initialDeckByType,
     Random? random,
+    List<String>? playerNames,
   }) {
     final n = activeTypes.length;
     final rng = random ?? Random();
+    if (playerNames != null && playerNames.length != n) {
+      throw ArgumentError(
+        'playerNames must have $n entries, got ${playerNames.length}',
+      );
+    }
 
     // Phase 1: Give each player N cards of their home type
     final initialHands = <int, List<GameCard>>{};
@@ -96,9 +105,11 @@ class InitialExchangeService {
         newHand.add(card);
       }
 
-      final isHuman = (p == 0);
-      final playerName = isHuman ? 'You' : botProfiles[p - 1].name;
-      final isFemale = isHuman ? false : botProfiles[p - 1].isFemale;
+      final isHuman = playerNames != null || p == 0;
+      final playerName = playerNames?[p] ??
+          (p == 0 ? 'You' : botProfiles[p - 1].name);
+      final isFemale =
+          playerNames != null || p == 0 ? false : botProfiles[p - 1].isFemale;
 
       players.add(
         GamePlayer(
