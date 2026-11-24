@@ -30,7 +30,7 @@ npm run lint                          # tsc --noEmit
 - Discard legality lives in **one place**: `GameState.isLegalDiscard`. `MoveValidator` wraps it with error messages and `BotStrategy` filters through it.
 - Win check: `GamePlayer.getWinningType(requiredSetSize: totalPlayers)` (wrapped by `WinnerDetector`).
 - `verifyIntegrity()` asserts card conservation and uniqueness after every move (debug/tests only).
-- Bots: `BotStrategy.evaluateDecision` scores legal discards and returns a "think" delay. It deliberately releases cards of the human's leading country (an intentional easy mode).
+- Bots: `BotStrategy.evaluateDecision` scores legal discards and returns a "think" delay. Behaviour depends on `GameSettings.botDifficulty`: Easy (default) reads the human's hand to release their leading country and also takes "relaxed pivot" turns; Normal keeps only the relaxed pivots; Hard has neither.
 
 **Engine ↔ animation handshake (the trickiest part).** `GameScreen` creates the engine with `waitForExchangeAnimation: true`. After each move the engine sets `isExchangeAnimating` and does **not** schedule the next bot until `completeExchangeAnimation()` is called. `PlayingTable` detects a new move in `didUpdateWidget` by comparing `turnCount`, runs the two-phase pass animation, and calls `onExchangeAnimationComplete`. With animations disabled it calls that callback on the next frame. Bot timers are paused and resumed through `pauseActivePlay` / `resumeActivePlay`, which keep the remaining delay. `GameScreen` pauses the engine whenever an overlay (tutorial, history, stats, pause/exit dialog) is open or cards are being dealt. Any new overlay must follow the same pause/resume pattern.
 

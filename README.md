@@ -10,7 +10,11 @@ An offline, landscape card-trading game for 3 to 7 players (you plus bots), buil
 - **Same-type restriction:** you cannot put down a card of the same country as the card currently on the table. The Global card can always be played, and any card can be played onto it.
 - The first player to hold **N cards of one country** wins. The Global card never counts toward a set.
 
-Bots only see their own hand. They deliberately release cards of the country you are collecting and occasionally pause their own collecting, which keeps the game approachable. See `lib/game/bot_strategy.dart`.
+Bot difficulty is chosen in **Settings** (see `lib/game/bot_strategy.dart`):
+
+- **Easy** (default): bots release cards of the country you are collecting and occasionally pause their own collecting. To do this they look at your hand.
+- **Normal**: bots only see their own hand and play for themselves, but still occasionally pause their own collecting.
+- **Hard**: bots always pursue their strongest set.
 
 ## Running
 

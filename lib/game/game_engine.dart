@@ -327,6 +327,7 @@ class GameEngine extends ChangeNotifier {
         precomputedDecision = BotStrategy.evaluateDecision(
           state: _state!,
           baseDelayMs: _settings.botDelayMs,
+          difficulty: _settings.botDifficulty,
         );
       } catch (e) {
         debugPrint('BotStrategy.evaluateDecision failed: $e');
@@ -361,8 +362,11 @@ class GameEngine extends ChangeNotifier {
       _cancelBotAction(clearRemaining: true);
 
       try {
-        final botDiscard =
-            discardToPlay ?? BotStrategy.chooseDiscard(state: _state!);
+        final botDiscard = discardToPlay ??
+            BotStrategy.chooseDiscard(
+              state: _state!,
+              difficulty: _settings.botDifficulty,
+            );
         makeMove(botDiscard);
       } catch (e) {
         debugPrint('Error in bot move: $e');

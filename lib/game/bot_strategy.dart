@@ -1,5 +1,6 @@
 import '../models/card_type.dart';
 import '../models/game_card.dart';
+import '../models/game_settings.dart';
 import '../models/game_state.dart';
 import 'move_validator.dart';
 
@@ -20,9 +21,12 @@ class BotDecision {
 class BotStrategy {
   /// Evaluates legal discards for the active bot and returns both the optimal [GameCard]
   /// and a natural, human-like `thinkDelayMs` scaled to the decision's complexity.
+  ///
+  /// [difficulty] controls how generous the bot is; see [BotDifficulty].
   static BotDecision evaluateDecision({
     required GameState state,
     int baseDelayMs = 1650,
+    BotDifficulty difficulty = BotDifficulty.easy,
   }) {
     final bot = state.currentPlayer;
     final hand = bot.hand;
@@ -61,12 +65,13 @@ class BotStrategy {
     final tableCard = state.tableCard;
     final typeCountsInHand = bot.ordinaryTypeCounts;
 
-    // Identify the human player's primary country so bots avoid hoarding it
+    // Easy only: identify the human player's primary country so bots avoid hoarding it
     // and naturally circulate those cards onto the table for a more approachable experience.
+    // This is the only place a bot reads another player's hand.
     CountryType? humanTargetType;
     int humanMaxCount = 0;
     for (final p in state.players) {
-      if (p.isHuman) {
+      if (difficulty == BotDifficulty.easy && p.isHuman) {
         final humanCounts = p.ordinaryTypeCounts;
         for (final entry in humanCounts.entries) {
           if (entry.value > humanMaxCount ||
@@ -82,7 +87,9 @@ class BotStrategy {
 
     final bool isHumanNext =
         ((state.currentTurnPlayerIndex + 1) % state.totalPlayers) == 0;
-    final bool isRelaxedPivotTurn = ((state.turnCount + bot.id) % 2) == 0;
+    // Easy/Normal: on alternate turns bots go easy on their own set-building.
+    final bool isRelaxedPivotTurn = difficulty != BotDifficulty.hard &&
+        ((state.turnCount + bot.id) % 2) == 0;
 
     // Determine bot's primary strategic target type
     CountryType? targetType;
@@ -221,9 +228,12 @@ class BotStrategy {
   /// Guarantees:
   /// - Only selects strictly legal moves.
   /// - Treats Starting Card ("Total World") as neutral.
-  /// - Never accesses hidden opponent hands.
+  /// - Reads the human's hand only on [BotDifficulty.easy] (to help them).
   /// - Targets collecting N cards of the same country (where N = state.totalPlayers).
-  static GameCard chooseDiscard({required GameState state}) {
-    return evaluateDecision(state: state).discardCard;
+  static GameCard chooseDiscard({
+    required GameState state,
+    BotDifficulty difficulty = BotDifficulty.easy,
+  }) {
+    return evaluateDecision(state: state, difficulty: difficulty).discardCard;
   }
 }

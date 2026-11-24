@@ -10,6 +10,7 @@ import 'package:country_game/game/move_validator.dart';
 import 'package:country_game/game/winner_detector.dart';
 import 'package:country_game/game/bot_strategy.dart';
 import 'package:country_game/game/game_engine.dart';
+import 'package:country_game/services/settings_store.dart';
 
 void main() {
   group('1-3: Initialization & Dynamic Winning Set Size for 3, 4, 5, 6 players', () {
@@ -434,6 +435,109 @@ void main() {
         }
         engine.makeMove(BotStrategy.chooseDiscard(state: state));
       }
+    });
+  });
+
+  group('Bot difficulty', () {
+    GameCard card(String id, CountryType t) => GameCard.ordinary(id: id, type: t);
+
+    // 4 players; the bot at seat 3 moves next and the human (seat 0) plays after it.
+    // The human leans towards Japan (home type, tie-break) and the bot holds 2 Japan cards.
+    GameState buildState() {
+      const types = [
+        CountryType.japan,
+        CountryType.iran,
+        CountryType.brazil,
+        CountryType.australia,
+      ];
+      GamePlayer player(int id, List<GameCard> hand) => GamePlayer(
+            id: id,
+            name: id == 0 ? 'You' : 'Bot$id',
+            isHuman: id == 0,
+            homeType: id == 0 ? CountryType.japan : types[id],
+            hand: hand,
+          );
+      return GameState(
+        totalPlayers: 4,
+        activeTypes: types,
+        players: [
+          player(0, [
+            card('h1', CountryType.japan),
+            card('h2', CountryType.iran),
+            card('h3', CountryType.brazil),
+            card('h4', CountryType.australia),
+          ]),
+          player(1, [
+            card('a1', CountryType.iran),
+            card('a2', CountryType.iran),
+            card('a3', CountryType.brazil),
+            card('a4', CountryType.australia),
+          ]),
+          player(2, [
+            card('b1', CountryType.brazil),
+            card('b2', CountryType.brazil),
+            card('b3', CountryType.iran),
+            card('b4', CountryType.australia),
+          ]),
+          player(3, [
+            card('c1', CountryType.japan),
+            card('c2', CountryType.japan),
+            card('c3', CountryType.iran),
+            GameCard.starting(),
+          ]),
+        ],
+        tableCard: card('t1', CountryType.australia),
+        startingPlayerIndex: 0,
+        currentTurnPlayerIndex: 3,
+        turnCount: 1,
+        isOpeningMove: false,
+        statusMessage: '',
+      );
+    }
+
+    test('Easy releases the human\'s country; Normal and Hard keep their pair', () {
+      final state = buildState();
+      GameCard pick(BotDifficulty d) =>
+          BotStrategy.chooseDiscard(state: state, difficulty: d);
+
+      expect(pick(BotDifficulty.easy).type, equals(CountryType.japan));
+      expect(pick(BotDifficulty.normal).type, isNot(CountryType.japan));
+      expect(pick(BotDifficulty.hard).type, isNot(CountryType.japan));
+    });
+
+    test('Every difficulty only plays legal moves and keeps integrity', () {
+      for (final difficulty in BotDifficulty.values) {
+        final engine = GameEngine(
+          initialSettings: GameSettings(
+            animationsEnabled: false,
+            botDifficulty: difficulty,
+          ),
+        );
+        engine.startNewGame(totalPlayers: 5, randomSeed: 2024);
+        for (int i = 0; i < 60 && !engine.state!.isGameOver; i++) {
+          final state = engine.state!;
+          final chosen = BotStrategy.chooseDiscard(state: state, difficulty: difficulty);
+          expect(state.isLegalDiscard(chosen), isTrue, reason: '$difficulty turn $i');
+          expect(engine.makeMove(chosen), isTrue);
+          expect(engine.verifyIntegrity(), isTrue);
+        }
+        engine.dispose();
+      }
+    });
+
+    test('Difficulty is saved and restored by SettingsStore', () {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      SettingsStore.save(
+        GameSettings.current.copyWith(botDifficulty: BotDifficulty.hard),
+      );
+      GameSettings.current = const GameSettings();
+      expect(GameSettings.current.botDifficulty, equals(BotDifficulty.easy));
+
+      SettingsStore.load();
+      expect(GameSettings.current.botDifficulty, equals(BotDifficulty.hard));
+
+      SettingsStore.save(const GameSettings());
+      GameSettings.current = const GameSettings();
     });
   });
 }

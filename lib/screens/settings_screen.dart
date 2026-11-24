@@ -16,6 +16,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late bool _hapticsEnabled;
   late bool _animationsEnabled;
   late int _botDelayMs;
+  late BotDifficulty _botDifficulty;
 
   @override
   void initState() {
@@ -24,6 +25,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _hapticsEnabled = HapticService.instance.isHapticsEnabled;
     _animationsEnabled = GameSettings.current.animationsEnabled;
     _botDelayMs = GameSettings.current.botDelayMs;
+    _botDifficulty = GameSettings.current.botDifficulty;
   }
 
   void _syncSettings() {
@@ -33,6 +35,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         hapticsEnabled: _hapticsEnabled,
         animationsEnabled: _animationsEnabled,
         botDelayMs: _botDelayMs,
+        botDifficulty: _botDifficulty,
       ),
     );
   }
@@ -43,6 +46,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _hapticsEnabled = true;
       _animationsEnabled = true;
       _botDelayMs = SettingsStore.normalBotDelayMs;
+      _botDifficulty = BotDifficulty.easy;
       _syncSettings();
     });
     AudioService.instance.playButtonClick();
@@ -345,6 +349,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                         _buildPaceButton('Relaxed', SettingsStore.relaxedBotDelayMs),
                                       ],
                                     ),
+                                    const Divider(
+                                      color: Colors.white12,
+                                      height: 20,
+                                    ),
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.psychology_rounded,
+                                          color: Color(0xFFFFD54F),
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              const Text(
+                                                'Bot Difficulty',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 12.5,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                              Text(
+                                                _difficultyDescription(
+                                                  _botDifficulty,
+                                                ),
+                                                style: const TextStyle(
+                                                  color: Color(0xFFFFD54F),
+                                                  fontSize: 10.5,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        for (final d in BotDifficulty.values) ...[
+                                          if (d != BotDifficulty.values.first)
+                                            const SizedBox(width: 8),
+                                          _buildChoiceButton(
+                                            label: d.label,
+                                            isSelected: _botDifficulty == d,
+                                            onSelected: () =>
+                                                _botDifficulty = d,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
                                   ],
                                 ),
                               ),
@@ -384,15 +442,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildPaceButton(String label, int ms) {
-    final isSelected = _botDelayMs == ms;
+  static String _difficultyDescription(BotDifficulty difficulty) =>
+      switch (difficulty) {
+        BotDifficulty.easy => 'Bots pass you cards you are collecting',
+        BotDifficulty.normal => 'Bots play for themselves',
+        BotDifficulty.hard => 'Bots always chase their best set',
+      };
+
+  Widget _buildPaceButton(String label, int ms) => _buildChoiceButton(
+        label: label,
+        isSelected: _botDelayMs == ms,
+        onSelected: () => _botDelayMs = ms,
+      );
+
+  /// One option in a segmented row (bot pace / bot difficulty).
+  Widget _buildChoiceButton({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onSelected,
+  }) {
     return Expanded(
       child: GestureDetector(
         onTap: () {
           AudioService.instance.playButtonClick();
           HapticService.instance.uiTap();
           setState(() {
-            _botDelayMs = ms;
+            onSelected();
             _syncSettings();
           });
         },
