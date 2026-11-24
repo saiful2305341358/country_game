@@ -4,6 +4,8 @@ Ideas to improve the Country Card Game. Add new ideas under **Ideas**; move them
 
 Format: `- [ ] Short title — what and why (optional notes)`
 
+Publishing to Google Play / the App Store is tracked separately in [RELEASE.md](RELEASE.md).
+
 ## Ideas
 
 - [ ] 
