@@ -18,7 +18,7 @@ Format: `- [ ] Short title — what and why`
 ### App identity
 - [x] **Final app ID: `com.saiful.countrygame`** (same on Android and iOS). It can never be changed after the first upload.
 - [ ] **Final app name.** It is "Country Game" in `AndroidManifest.xml` (`android:label`) and in `ios/Runner/Info.plist` (`CFBundleDisplayName`). Check that the name is not already taken in the stores.
-- [ ] **App icon.** Make sure the icons in `android/app/src/main/res/mipmap-*` and `ios/Runner/Assets.xcassets/AppIcon.appiconset` are the final design, not Flutter's default. The `flutter_launcher_icons` package can generate every size from one 1024×1024 image.
+- [x] **App icon.** The game medallion logo (`GameLogo`) on the emerald felt, for Android (with an adaptive icon for Android 8+), iOS, macOS, Windows and web. Regenerate with `flutter test tool/generate_app_icons_test.dart` if the logo changes. Still optional: a single-colour "themed" icon for Android 13+ (without it, phones using themed icons show the normal icon).
 - [ ] **Version number.** `version: 1.0.0+1` in `pubspec.yaml`. The part after `+` (the build number) must go up with **every** upload to either store.
 
 ### Multiplayer readiness

@@ -18,6 +18,7 @@ flutter test test/game_engine_test.dart
 flutter test test/game_engine_test.dart --plain-name "createDeck rejects"   # single test by name
 flutter run                           # device / desktop
 flutter run -d chrome                 # web
+flutter test tool/generate_app_icons_test.dart   # regenerate app icons (all platforms) from GameLogo
 
 # React port
 npm install && npm run dev            # vite on :3000
