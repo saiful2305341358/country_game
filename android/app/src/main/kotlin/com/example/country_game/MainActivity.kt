@@ -8,6 +8,7 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
 import android.media.SoundPool
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
@@ -43,6 +44,9 @@ class MainActivity : FlutterActivity() {
     private val activeStreams = CopyOnWriteArrayList<Int>()
     private val activeTracks = CopyOnWriteArrayList<AudioTrack>()
     private val audioScheduler = Executors.newScheduledThreadPool(3)
+
+    /** Held while the nearby-rooms list listens, so Wi-Fi delivers UDP announcements. */
+    private var multicastLock: WifiManager.MulticastLock? = null
 
     private val gameAudioAttributes: AudioAttributes by lazy {
         AudioAttributes.Builder()
@@ -257,6 +261,10 @@ class MainActivity : FlutterActivity() {
                         } catch (_: Throwable) {}
                         result.success(null)
                     }
+                    "multicastLock" -> {
+                        setMulticastLock(call.argument<Boolean>("on") ?: false)
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -435,7 +443,26 @@ class MainActivity : FlutterActivity() {
         } catch (_: Throwable) {}
     }
 
+    private fun setMulticastLock(on: Boolean) {
+        try {
+            if (on) {
+                if (multicastLock == null) {
+                    val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+                    multicastLock = wifi?.createMulticastLock("country_game_nearby")?.apply {
+                        setReferenceCounted(false)
+                    }
+                }
+                multicastLock?.acquire()
+            } else {
+                multicastLock?.let { if (it.isHeld) it.release() }
+            }
+        } catch (_: Throwable) {
+            // Best-effort: joining by room code works without it.
+        }
+    }
+
     override fun onDestroy() {
+        setMulticastLock(false)
         stopAllActiveAudio()
         try {
             soundPool?.release()

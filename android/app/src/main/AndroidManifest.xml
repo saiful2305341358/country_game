@@ -2,6 +2,8 @@
     <uses-permission android:name="android.permission.VIBRATE"/>
     <!-- Internet rooms (Supabase) -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Nearby rooms: lets Wi-Fi deliver the "room nearby" UDP announcements -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
     <application
         android:label="Country Game"
         android:name="${applicationName}"

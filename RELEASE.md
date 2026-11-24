@@ -6,7 +6,7 @@ Format: `- [ ] Short title — what and why`
 
 ## Status today (2026-11-24)
 
-- `flutter build apk --release` works with Android Gradle Plugin 9.3.1, Kotlin 2.4.20 and Gradle 9.5.0, with no version warnings.
+- Android release builds work (Android Gradle Plugin 9.3.1, Kotlin 2.4.20, Gradle 9.5.0). Supports Android 7.0 (API 24) to Android 16 (API 36); native libraries are 16 KB page-aligned, as Play requires. See **Final build commands** below.
 - Not yet tested on a real phone. iOS has never been built (it needs a Mac).
 - App ID is still `com.example.country_game` (Android) / `com.example.countryGame` (iOS). Both stores reject or discourage `com.example`.
 - Release builds are signed with the **debug key**. Google Play rejects that.
@@ -41,9 +41,43 @@ Format: `- [ ] Short title — what and why`
 ### Testing before submitting
 - [ ] Offline game with 3, 5 and 7 players on a small phone and a tablet (layout, sounds, vibration, stats saved after the app restarts).
 - [ ] Internet room with 3+ real phones on mobile data and on Wi-Fi: create, join, play several rounds, someone leaves, someone joins mid-round.
-- [ ] Nearby room with 3+ phones on **one phone's hotspot** and on **home Wi-Fi**: join by code, the nearby list, turn Wi-Fi off and on during a round (20-second reconnect).
+- [ ] Nearby room with 3+ phones on **one phone's hotspot** and on **home Wi-Fi**: join by code, the nearby list, turn Wi-Fi off and on during a round (20-second reconnect). Include a hotspot test where the **host's mobile data is off**: friends' phones then see "Wi-Fi without internet", and some Android phones prefer mobile data in that case.
 - [ ] Android and iPhone in the same nearby room.
 - [ ] Test the **release** build, not only debug (code shrinking can remove things that debug keeps).
+
+---
+
+## Final build commands
+
+Run these from the project folder, after the app ID and upload key (section 2) are done.
+
+```sh
+# Google Play: upload this .aab
+flutter build appbundle --release --obfuscate --split-debug-info=build/symbols
+#   -> build/app/outputs/bundle/release/app-release.aab
+
+# Sharing the APK directly (WhatsApp, Drive, etc.): one small APK per phone type
+flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/symbols
+#   -> build/app/outputs/flutter-apk/app-arm64-v8a-release.apk    (almost all phones from 2017 on)
+#   -> build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk  (older / very cheap phones)
+#   -> build/app/outputs/flutter-apk/app-x86_64-release.apk       (emulators, some Chromebooks)
+
+# iOS (on a Mac)
+flutter build ipa --release --obfuscate --split-debug-info=build/symbols
+```
+
+Sizes measured on 2026-11-24:
+
+| Build | Size |
+|---|---|
+| Plain `flutter build apk --release` (all 3 phone types in one file) | 54.5 MB |
+| Split APK, arm64-v8a | 18.0 MB |
+| Split APK, armeabi-v7a | 15.6 MB |
+| `.aab` uploaded to Play | 50.6 MB, but Play delivers only the phone's own part (about 16–18 MB) |
+
+The app has no image or sound files (sounds are generated in code), and the game's own code is about 0.4 MB. The rest is the Flutter engine and libraries, so the split builds above are as small as a Flutter app gets.
+
+The `.aab` build prints "The generated ELF library contains unobfuscated DWARF debugging information". This is expected: it refers to the crash-report symbols stored inside the bundle for Play Console, which are not sent to phones.
 
 ---
 
@@ -61,10 +95,10 @@ Format: `- [ ] Short title — what and why`
   3. In `android/app/build.gradle.kts`, add a `release` signing config that reads `key.properties` and use it instead of `signingConfigs.getByName("debug")`.
   4. Guide: https://docs.flutter.dev/deployment/android
 - [x] **Raise build tool versions** to remove the "support will soon be dropped" warnings: Android Gradle Plugin 9.3.1 and Kotlin 2.4.20 in `android/settings.gradle.kts`.
-- [ ] **Build the bundle:** `flutter build appbundle --release`. The output is `build/app/outputs/bundle/release/app-release.aab`. Play needs `.aab`, not `.apk`.
+- [ ] **Build the bundle:** see **Final build commands** below. Play needs `.aab`, not `.apk`.
 - [ ] **Target API level.** Play requires a recent `targetSdk`. It comes from `flutter.targetSdkVersion`; check Play Console's current requirement at upload time.
-- [ ] **Optional:** use `flutter build appbundle --obfuscate --split-debug-info=build/symbols` and keep the symbols folder to read crash reports.
-- [ ] **Optional, nearby-list reliability:** some Android phones drop the UDP "room announcements" while idle. Holding a `WifiManager.MulticastLock` in `MainActivity.kt` while the nearby screen is open (plus the `CHANGE_WIFI_MULTICAST_STATE` permission) makes the list more reliable. Joining by code works without it.
+- [x] **Smaller download:** the final build commands below use `--obfuscate --split-debug-info=build/symbols` (about 1.4 MB less per phone). Keep the `build/symbols` folder of every release you upload: it is needed to read crash reports.
+- [x] **Nearby-list reliability:** Android holds a Wi-Fi multicast lock while the nearby list is open (`multicastLock` in `MainActivity.kt`, `CHANGE_WIFI_MULTICAST_STATE` permission), so the UDP "room announcements" arrive on phones that would otherwise drop them. Joining by code works without it.
 
 ### Play Console
 - [ ] **Google Play developer account** (one-time US$25 fee, identity verification).

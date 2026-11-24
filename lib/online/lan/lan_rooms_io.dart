@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
+
 import '../room_session.dart';
 import 'lan_client_session.dart';
 import 'lan_errors.dart';
@@ -12,6 +14,19 @@ import 'nearby_room.dart';
 /// Nearby (Wi-Fi / hotspot) rooms on Android, iOS and desktop.
 class LanRooms {
   static const bool isSupported = true;
+
+  static const MethodChannel _native = MethodChannel(
+    'com.example.country_game/native_feedback',
+  );
+
+  /// Many Android phones drop broadcast packets unless the app holds a Wi-Fi
+  /// multicast lock (`multicastLock` in `MainActivity.kt`). Best-effort.
+  static Future<void> _multicastLock(bool on) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _native.invokeMethod<void>('multicastLock', {'on': on});
+    } catch (_) {}
+  }
 
   /// This phone's local Wi-Fi / hotspot addresses, best candidate first.
   static Future<List<String>> localAddresses() async {
@@ -98,6 +113,7 @@ class LanRooms {
 
     controller = StreamController<List<NearbyRoom>>(
       onListen: () async {
+        unawaited(_multicastLock(true));
         try {
           socket = await RawDatagramSocket.bind(
             InternetAddress.anyIPv4,
@@ -135,6 +151,7 @@ class LanRooms {
         emit();
       },
       onCancel: () {
+        unawaited(_multicastLock(false));
         pruneTimer?.cancel();
         socket?.close();
       },
