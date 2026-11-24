@@ -9,7 +9,7 @@ Format: `- [ ] Short title — what and why`
 - Android release builds work (Android Gradle Plugin 9.3.1, Kotlin 2.4.20, Gradle 9.5.0). Supports Android 7.0 (API 24) to Android 16 (API 36); native libraries are 16 KB page-aligned, as Play requires. See **Final build commands** below.
 - Not yet tested on a real phone. iOS has never been built (it needs a Mac).
 - App ID is `com.saiful.countrygame` on Android, iOS, macOS and Linux.
-- Release builds are signed with the **debug key** until `android/key.properties` is created (the upload key itself exists; see section 2). Google Play rejects debug-signed builds.
+- Release builds are signed with the upload key (`android/key.properties`, kept out of git).
 
 ---
 
@@ -85,9 +85,9 @@ The `.aab` build prints "The generated ELF library contains unobfuscated DWARF d
 
 ### Code and build
 - [x] **Change the Android app ID** to `com.saiful.countrygame`: `namespace` and `applicationId` in `android/app/build.gradle.kts`, `MainActivity.kt` moved to `android/app/src/main/kotlin/com/saiful/countrygame/`, and the keep rule in `android/app/proguard-rules.pro`. The internal MethodChannel name `com.example.country_game/native_feedback` stays as it is: it is only a label inside the app and players never see it.
-- [ ] **Create an upload key and sign release builds with it.** (Steps 1 and 3 done; step 2 still to do.)
+- [x] **Create an upload key and sign release builds with it.** Release APKs and the `.aab` are signed with the upload key (certificate SHA-256 `9225c55dbe8994ba9633ce83c63803a24976d8e3bf661a6044764a6ddf60de22`).
   1. [x] Key created at `/home/saiful/upload-keystore.jks` (alias `upload`), with `/opt/android-studio/jbr/bin/keytool -genkey -v -keystore ~/upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload`.
-  2. [ ] Create `android/key.properties` (ignored by git):
+  2. [x] Create `android/key.properties` (ignored by git):
      ```properties
      storePassword=YOUR_PASSWORD
      keyPassword=YOUR_PASSWORD
