@@ -6,7 +6,7 @@ Format: `- [ ] Short title — what and why`
 
 ## Status today (2026-11-24)
 
-- `flutter build apk --release` works (after raising the Android Gradle Plugin to 9.1.1 and Gradle to 9.5.0).
+- `flutter build apk --release` works with Android Gradle Plugin 9.3.1, Kotlin 2.4.20 and Gradle 9.5.0, with no version warnings.
 - Not yet tested on a real phone. iOS has never been built (it needs a Mac).
 - App ID is still `com.example.country_game` (Android) / `com.example.countryGame` (iOS). Both stores reject or discourage `com.example`.
 - Release builds are signed with the **debug key**. Google Play rejects that.
@@ -60,7 +60,7 @@ Format: `- [ ] Short title — what and why`
   2. Create `android/key.properties` with the keystore path, alias and passwords. It is already ignored by git. **Never commit the `.jks` file or `key.properties`; back them up somewhere safe.**
   3. In `android/app/build.gradle.kts`, add a `release` signing config that reads `key.properties` and use it instead of `signingConfigs.getByName("debug")`.
   4. Guide: https://docs.flutter.dev/deployment/android
-- [ ] **Raise build tool versions** to remove the "support will soon be dropped" warnings: Android Gradle Plugin 9.3.1 and Kotlin 2.4.20 in `android/settings.gradle.kts`.
+- [x] **Raise build tool versions** to remove the "support will soon be dropped" warnings: Android Gradle Plugin 9.3.1 and Kotlin 2.4.20 in `android/settings.gradle.kts`.
 - [ ] **Build the bundle:** `flutter build appbundle --release`. The output is `build/app/outputs/bundle/release/app-release.aab`. Play needs `.aab`, not `.apk`.
 - [ ] **Target API level.** Play requires a recent `targetSdk`. It comes from `flutter.targetSdkVersion`; check Play Console's current requirement at upload time.
 - [ ] **Optional:** use `flutter build appbundle --obfuscate --split-debug-info=build/symbols` and keep the symbols folder to read crash reports.
